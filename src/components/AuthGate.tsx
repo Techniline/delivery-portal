@@ -7,17 +7,14 @@ import Link from 'next/link'
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
     const s = supabase()
     s.auth.getSession().then(({ data }) => { setSession(data.session ?? null); setLoading(false) })
     const { data: sub } = s.auth.onAuthStateChange((_e, sess) => setSession(sess))
     return () => { sub?.subscription.unsubscribe() }
   }, [])
-
-  if (loading) return <div className="p-6">Loading</div>
+  if (loading) return <div className="p-6">Loading…</div>
   if (!session) return <AuthForm />
-
   return (
     <div className="min-h-screen">
       <Navbar onSignOut={() => supabase().auth.signOut()} />
@@ -25,7 +22,6 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-
 function AuthForm() {
   const [email, setEmail] = useState(''); const [pass, setPass] = useState(''); const [mode, setMode] = useState<'signin'|'signup'>('signin')
   const s = supabase()
@@ -38,9 +34,7 @@ function AuthForm() {
   return (
     <div className="min-h-screen grid place-items-center p-6">
       <form onSubmit={submit} className="card w-full max-w-sm">
-        <div className="card-header">
-          <h1 className="text-xl font-semibold" style={{color:'#0B0B0C'}}>Delivery Portal</h1>
-        </div>
+        <div className="card-header"><h1 className="text-xl font-semibold" style={{color:'#0B0B0C'}}>Delivery Portal</h1></div>
         <div className="card-body space-y-3">
           <input className="w-full border rounded-lg px-3 py-2" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} />
           <input className="w-full border rounded-lg px-3 py-2" type="password" placeholder="Password" value={pass} onChange={e=>setPass(e.target.value)} />
@@ -56,7 +50,6 @@ function AuthForm() {
     </div>
   )
 }
-
 function Navbar({ onSignOut }: { onSignOut: () => void }) {
   return (
     <header className="navbar">
@@ -64,9 +57,7 @@ function Navbar({ onSignOut }: { onSignOut: () => void }) {
         <Link href="/" className="font-semibold text-lg" style={{color:'#0B0B0C'}}>Calendar</Link>
         <Link href="/requests" className="navlink">My Requests</Link>
         <Link href="/approvals" className="navlink">Approvals</Link>
-        <div className="ml-auto">
-          <button onClick={onSignOut} className="btn btn-outline">Sign out</button>
-        </div>
+        <div className="ml-auto"><button onClick={onSignOut} className="btn btn-outline">Sign out</button></div>
       </div>
     </header>
   )

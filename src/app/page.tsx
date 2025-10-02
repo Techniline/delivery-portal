@@ -1,6 +1,5 @@
 import AuthGate from '@/components/AuthGate'
 import CalendarView from '@/components/CalendarView'
-
 export default function Page() {
   return (
     <AuthGate>
