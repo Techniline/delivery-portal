@@ -1,0 +1,23 @@
+'use client'
+import React from 'react'
+
+export default function Modal({
+  children,
+  onClose,
+  title
+}: { children: React.ReactNode, onClose: () => void, title?: string }) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xl">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h3 className="font-semibold">{title ?? 'New Request'}</h3>
+          <button onClick={onClose} className="px-2 py-1 rounded-lg hover:bg-neutral-100">✕</button>
+        </div>
+        <div className="p-4">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}

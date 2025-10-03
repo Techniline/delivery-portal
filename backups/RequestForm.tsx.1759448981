@@ -1,0 +1,45 @@
+'use client'
+import { useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+
+export default function RequestForm({ defaultWarehouseId = 1, onSubmitted }: { defaultWarehouseId?: number, onSubmitted?: () => void }) { onCreated }: { onCreated?: () => void }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10))
+  const [start, setStart] = useState('10:00'); const [end, setEnd] = useState('11:00')
+  const [warehouseId, setWarehouseId] = useState<number>(1)
+  const [dockId, setDockId] = useState<number | undefined>(undefined)
+  const [location, setLocation] = useState(''); const [notes, setNotes] = useState('')
+  const s = supabase()
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const { data: user } = await s.auth.getUser()
+    const uid = user.user?.id; if (!uid) return
+    const { error } = await s.from('bookings').insert({
+      origin:'SHOWROOM_REQUEST', status:'PENDING', creator_user_id: uid,
+      warehouse_id: warehouseId, dock_id: dockId ?? null,
+      date, start_time: `${start}:00`, end_time: `${end}:00`,
+      delivery_location: location || null, notes: notes || null
+    })
+    if (error) alert(error.message); else { onCreated?.(); setNotes('') }
+  }
+
+  return (
+    <form onSubmit={submit} className="card">
+      <div className="card-header">
+        <h2 className="font-semibold">New Request</h2>
+      </div>
+      <div className="card-body grid grid-cols-2 gap-4">
+        <div><label className="block text-sm">Date</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
+        <div className="grid grid-cols-2 gap-2">
+          <div><label className="block text-sm">Start</label><input type="time" value={start} onChange={e=>setStart(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
+          <div><label className="block text-sm">End</label><input type="time" value={end} onChange={e=>setEnd(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
+        </div>
+        <div><label className="block text-sm">Warehouse ID</label><input type="number" value={warehouseId} onChange={e=>setWarehouseId(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2" /></div>
+        <div><label className="block text-sm">Dock ID (optional)</label><input type="number" value={dockId ?? ''} onChange={e=>setDockId(e.target.value?Number(e.target.value):undefined)} className="w-full border rounded-lg px-3 py-2" /></div>
+        <div className="col-span-2"><label className="block text-sm">Delivery location</label><input value={location} onChange={e=>setLocation(e.target.value)} className="w-full border rounded-lg px-3 py-2" placeholder="Customer site / showroom" /></div>
+        <div className="col-span-2"><label className="block text-sm">Notes</label><textarea value={notes} onChange={e=>setNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2" /></div>
+        <div className="col-span-2"><button className="btn btn-primary">Request Slot</button></div>
+      </div>
+    </form>
+  )
+}

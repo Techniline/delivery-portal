@@ -31,17 +31,7 @@ type BookingRow = {
   vehicle_model?:string|null
 }
 
-const LOCATION_COLORS: Record<string, string> = {
-  'Al Shoala Showroom':'#2563EB',
-  'MusicMajlis':'#9333EA',
-  'Amazon Delivery':'#4F46E5',
-  'B2B':'#0EA5E9',
-  'Soundline Main':'#059669',
-  'Other Delivery':'#6B7280',
-  'Showroom Delivery':'#EF4444',
-}
 export default function CalendarView() {
-  const [locFilter, setLocFilter] = useState<string>('All')
   const s = supabase()
   const calRef = useRef<any>(null)
 
@@ -174,25 +164,7 @@ export default function CalendarView() {
           <span className="legend-chip loc-showroom-delivery">Showroom Delivery</span>
         </div>
 
-        <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="text-sm">
-                <span className="mr-2 text-gray-500">Legend:</span>
-                {Object.entries(LOCATION_COLORS).map(([name,color])=>(
-                  <span key={name} className="inline-flex items-center gap-2 mr-2 text-xs rounded-full px-2 py-1"
-                        style={{background: color, color:'#fff'}}>
-                    {name}
-                  </span>
-                ))}
-              </div>
-              <div>
-                <select value={locFilter} onChange={(e)=>setLocFilter(e.target.value)}
-                        className="rounded-full border px-3 py-1 text-sm">
-                  <option>All</option>
-                  {Object.keys(LOCATION_COLORS).map(n=> <option key={n}>{n}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="rounded-2xl overflow-hidden border"  style={{borderColor:'var(--line)'}}>
+        <div className="rounded-2xl overflow-hidden border" style={{borderColor:'var(--line)'}}>
           <FullCalendar
             ref={(r:any)=> (calRef.current = r)}
             plugins={[timeGridPlugin, interactionPlugin]}
@@ -202,7 +174,7 @@ export default function CalendarView() {
             timeZone="Asia/Dubai"
             slotMinTime="08:00:00"
             slotMaxTime="20:00:00"
-            events={locFilter==='All' ? events : events.filter((e:any)=> (e.extendedProps?.delivery_location||'')===locFilter)}
+            events={events}
             eventContent={renderEvent}
             selectable
             dateClick={(info:any)=> openNew(info.date)}
@@ -251,12 +223,6 @@ export default function CalendarView() {
           />
         </div>
       </Modal>
-    
-      {showModal && (
-        <Modal title="New Request" onClose={closeModal}>
-          <RequestForm onSubmitted={closeModal} />
-        </Modal>
-      )}
-</div>
+    </div>
   )
 }

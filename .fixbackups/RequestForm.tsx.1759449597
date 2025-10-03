@@ -1,0 +1,142 @@
+'use client'
+import { useState, useMemo } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import { format } from 'date-fns'
+
+const LOCATIONS = [
+  'Al Shoala Showroom',
+  'MusicMajlis',
+  'Amazon Delivery',
+  'B2B',
+  'Soundline Main',
+  'Other Delivery',
+  'Showroom Delivery'
+]
+
+export default function RequestForm({
+  defaultWarehouseId = 1,
+  onSubmitted
+}: { defaultWarehouseId?: number, onSubmitted?: () => void }) {
+
+  const [date, setDate] = useState(new Date().toISOString().slice(0,10))
+  const [start, setStart] = useState('10:00')
+  const [end, setEnd]   = useState('11:00')
+  const [warehouseId, setWarehouseId] = useState<number>(defaultWarehouseId)
+  const [dockId, setDockId] = useState<number | undefined>()
+  const [location, setLocation] = useState(LOCATIONS[0])
+  const [notes, setNotes] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const timeOk = useMemo(() => start < end, [start, end])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!timeOk) return
+    setSubmitting(true)
+    try {
+      const s = supabase()
+      const payload = {
+        origin: 'SHOWROOM_REQUEST',
+        status: 'PENDING',
+        creator_user_id: (await s.auth.getUser()).data.user?.id,
+        warehouse_id: warehouseId,
+        dock_id: dockId ?? null,
+        date,
+        start_time: start + ':00',
+        end_time: end + ':00',
+        delivery_location: location,
+        notes,
+      }
+      const { error } = await s.from('bookings').insert(payload)
+      if (error) throw error
+      // toast + auto-close
+      if (typeof window !== 'undefined') {
+        // very light toast
+        const id = 'toast-ok'
+        const el = document.createElement('div')
+        el.id = id
+        el.textContent = 'Request submitted'
+        el.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0ea5e9;color:#fff;padding:10px 14px;border-radius:12px;z-index:9999;font-weight:600'
+        document.body.appendChild(el)
+        setTimeout(()=> el.remove(), 1500)
+      }
+      onSubmitted?.()
+    } catch (err:any) {
+      alert(err.message ?? 'Failed to submit')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* quick duration chips */}
+      <div className="flex gap-2">
+        {['30','60','90','120'].map(min => (
+          <button
+            key={min}
+            type="button"
+            className="px-3 py-1 rounded-full border hover:bg-neutral-50"
+            onClick={()=>{
+              const [h,m] = start.split(':').map(Number)
+              const d = new Date(`1970-01-01T${start}:00`)
+              d.setMinutes(d.getMinutes()+Number(min))
+              const hh = String(d.getHours()).padStart(2,'0')
+              const mm = String(d.getMinutes()).padStart(2,'0')
+              setEnd(`${hh}:${mm}`)
+            }}>
+            {min}m
+          </button>
+        ))}
+      </div>
+
+      {/* first row */}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-neutral-600">Date</span>
+          <input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-neutral-600">Start</span>
+            <input type="time" className="input" value={start} onChange={e=>setStart(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-neutral-600">End</span>
+            <input type="time" className="input" value={end} onChange={e=>setEnd(e.target.value)} />
+          </label>
+        </div>
+      </div>
+
+      {/* second row */}
+      <div className="grid grid-cols-3 gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-neutral-600">Warehouse</span>
+          <input type="number" className="input" value={warehouseId} onChange={e=>setWarehouseId(Number(e.target.value || 1))} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-neutral-600">Dock (optional)</span>
+          <input type="number" className="input" value={dockId ?? ''} onChange={e=>setDockId(e.target.value ? Number(e.target.value) : undefined)} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm text-neutral-600">Location</span>
+          <select className="input" value={location} onChange={e=>setLocation(e.target.value)}>
+            {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-sm text-neutral-600">Notes</span>
+        <textarea className="input min-h-[80px]" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Anything the warehouse should know..." />
+      </label>
+
+      <div className="flex items-center justify-between">
+        <span className={`text-sm ${timeOk ? 'text-emerald-600' : 'text-red-600'}`}>{timeOk ? 'Time OK' : 'Invalid time range'}</span>
+        <button disabled={submitting || !timeOk} className={`btn btn-primary ${submitting?'opacity-60 cursor-not-allowed':''}`}>
+          {submitting ? 'Requesting…' : 'Request Slot'}
+        </button>
+      </div>
+    </form>
+  )
+}

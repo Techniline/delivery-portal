@@ -1,0 +1,248 @@
+'use client'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+import FullCalendar from '@fullcalendar/react'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import { Booking } from '@/lib/types'
+import Modal from './Modal'
+import RequestForm from './RequestForm'
+import QuickSlotPicker from './QuickSlotPicker'
+import { format, parseISO } from 'date-fns'
+
+function toISOInDubai(date: string | null, time: string | null) {
+  if (!date || !time) return null
+  const hhmm = time.length === 5 ? time + ':00' : time
+  return `${date}T${hhmm}+04:00`
+}
+
+\1
+  const [showModal, setShowModal] = useState(false)
+  const [slot, setSlot] = useState<{date:string, start:string, end:string}>()
+
+  const s = supabase()
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [activeDate, setActiveDate] = useState<string>(new Date().toISOString().slice(0,10))
+  const [createModal, setCreateModal] = useState<{open:boolean, date?:string, start?:string, end?:string}>({open:false})
+  const [viewModal, setViewModal] = useState<{open:boolean, row?:any, signedUrl?:string}>({open:false})
+  const [view, setView] = useState<'timeGridWeek'|'timeGridDay'>('timeGridWeek')
+
+  async function load() {
+    const { data: u } = await s.auth.getUser()
+    const uid = u.user?.id ?? null
+    const { data: approved } = await s.from('bookings').select('*').eq('status','APPROVED')
+    let mine: Booking[] = []
+    if (uid) {
+      const { data } = await s.from('bookings').select('*').eq('creator_user_id', uid)
+      mine = data || []
+    }
+    const merged = [...(approved||[]), ...(mine||[])]
+      .reduce((acc:Record<number,any>,b)=>{acc[b.id]=b;return acc}, {})
+    setBookings(Object.values(merged) as any)
+  }
+
+  useEffect(() => {
+    load()
+    const ch = s.channel('bookings-calendar')
+      .on('postgres_changes', { event:'*', schema:'public', table:'bookings' }, load)
+      .subscribe()
+    return () => { s.removeChannel(ch) }
+  }, [])
+
+  const events = useMemo(() => bookings.map((b:any) => ({
+    id: String(b.id),
+    title: `${b.driver_name ?? 'Driver TBC'} • ${b.vehicle_plate ?? 'Vehicle TBC'}`,
+    start: toISOInDubai(b.date, b.start_time),
+    end: toISOInDubai(b.date, b.end_time),
+    status: b.status,
+    origin: b.origin,
+    driver_photo_url: b.driver_photo_url || '',
+    delivery_location: b.delivery_location,
+    data: b
+  })).filter(e => e.start && e.end), [bookings])
+
+  async function onEventClick(info: any) {
+    const row = info.event.extendedProps.data
+    let signedUrl: string | undefined
+    if (row.attachment_path) {
+      const r = await fetch('/api/files/signed', {
+        method:'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ path: row.attachment_path, expiresIn: 600 })
+      }).then(r=>r.json())
+      if (!r.error) signedUrl = r.url
+    }
+    setViewModal({ open:true, row, signedUrl })
+  }
+
+  function onSelect(info:any) {
+    const start = info.start
+    const end = info.end
+    const pad = (n:number)=> String(n).padStart(2,'0')
+    const toHHMM = (d:Date)=> `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const date = `${start.getFullYear()}-${pad(start.getMonth()+1)}-${pad(start.getDate())}`
+    setCreateModal({ open:true, date, start: toHHMM(start), end: toHHMM(end) })
+  }
+
+  function renderEvent(arg:any) {
+    const s = (arg.event.extendedProps as any)
+    const when = `${format(parseISO(arg.event.startStr), 'HH:mm')}–${format(parseISO(arg.event.endStr), 'HH:mm')}`
+    const bg =
+      s.status==='APPROVED' ? (s.origin==='WAREHOUSE_BOOKING' ? '#E8FAF0' : '#E9FFE7')
+    : s.status==='PENDING'  ? '#F8FAFF'
+    : '#FFF1F2'
+    const bd =
+      s.status==='APPROVED' ? '#16A34A'
+    : s.status==='PENDING'  ? '#64748B'
+    : '#DC2626'
+    const av = s.driver_photo_url ? `<img class="avatar" src="${s.driver_photo_url}" alt="d" />` : `<div class="avatar"></div>`
+    return {
+      html: `
+        <div class="event-chip" style="background:${bg}; border:1px solid ${bd}">
+          <div style="display:flex; align-items:center; gap:8px">
+            ${av}
+            <div>
+              <div class="title">${arg.event.title}</div>
+              <div class="sub">${when}${s.delivery_location ? ` • ${s.delivery_location}` : ''}</div>
+            </div>
+          </div>
+        </div>`
+    }
+  }
+
+  const pad=(n:number)=>String(n).padStart(2,'0')
+  const toISODate=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+  const toHHMM=(d:Date)=>`${pad(d.getHours())}:${pad(d.getMinutes())}`
+
+  return (
+    <>
+      <div className="panel">
+        <div className="panel-header">
+          <div className="panel-title">Calendar</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={()=>{ setView('timeGridDay'); (window as any).calendar?.changeView('timeGridDay') }}
+              className={`pill ${view==='timeGridDay'?'is-free':''}`}
+            >
+              <span className="dot" style={{background: view==='timeGridDay' ? 'var(--brand)' : '#CBD5E1'}}></span>
+              Day
+            </button>
+            <button
+              onClick={()=>{ setView('timeGridWeek'); (window as any).calendar?.changeView('timeGridWeek') }}
+              className={`pill ${view==='timeGridWeek'?'is-free':''}`}
+            >
+              <span className="dot" style={{background: view==='timeGridWeek' ? 'var(--brand)' : '#CBD5E1'}}></span>
+              Week
+            </button>
+            <button onClick={()=> (window as any).calendar?.today()} className="btn btn-outline">Today</button>
+            <button onClick={()=> (window as any).calendar?.prev()} className="btn btn-outline">‹</button>
+            <button onClick={()=> (window as any).calendar?.next()} className="btn btn-outline">›</button>
+          </div>
+        </div>
+
+        <div className="panel-body">
+          {/* Quick slots (30-min) for the currently focused day */}
+          <QuickSlotPicker
+            dateISO={activeDate}
+            warehouseId={1}
+            onPick={(sHH, eHH) => setCreateModal({ open:true, date: activeDate, start: sHH, end: eHH })}
+          />
+
+          <div className="rounded-2xl overflow-hidden border" style={{borderColor:'var(--line)'}}>
+            <FullCalendar
+              plugins={[timeGridPlugin, interactionPlugin]}
+              dateClick={(info:any)=>{ const s=new Date(info.dateStr); const e=new Date(s.getTime()+60*60000); setSlot({date:toISODate(s), start:toHHMM(s), end:toHHMM(e)}); setShowModal(true) }}
+              select={(info:any)=>{ const s=new Date(info.start); const e=new Date(info.end); setSlot({date:toISODate(s), start:toHHMM(s), end:toHHMM(e)}); setShowModal(true) }}
+              selectable
+              initialView={view}
+              nowIndicator
+              selectable
+              selectMirror
+              slotMinTime="08:00:00"
+              slotMaxTime="20:00:00"
+              slotDuration="00:30:00"
+              expandRows
+              height="auto"
+              timeZone="local"
+              events={events}
+              select={onSelect}
+              eventClick={onEventClick}
+              eventContent={renderEvent}
+              datesSet={(info:any) => {
+                const d = new Date(info.start.getTime() + (info.end.getTime()-info.start.getTime())/2)
+                const pad = (n:number)=> String(n).padStart(2,'0')
+                setActiveDate(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`)
+                ;(window as any).calendar = info.view.calendar
+              }}
+            />
+          </div>
+          <Modal open={showModal} onClose={()=>setShowModal(false)} title="New Request">
+            <div className="space-y-4">
+              <QuickSlotPicker onPick={(mins)=>{
+                if(!slot) return
+                const [h,m] = slot.start.split(':').map(Number)
+                const s = new Date(`${slot.date}T${slot.start}:00`)
+                const e = new Date(s.getTime() + mins*60000)
+                const pad=(n:number)=>String(n).padStart(2,'0')
+                setSlot({...slot, end:`${pad(e.getHours())}:${pad(e.getMinutes())}`})
+              }}/>
+              <div className="grid grid-cols-3 gap-3">
+                <div><div className="label">Date</div><input className="input" type="date" value={slot?.date||''} onChange={e=> setSlot(v=> v?{...v, date:e.target.value}:v)}/></div>
+                <div><div className="label">Start</div><input className="input" type="time" value={slot?.start||''} onChange={e=> setSlot(v=> v?{...v, start:e.target.value}:v)}/></div>
+                <div><div className="label">End</div><input className="input" type="time" value={slot?.end||''} onChange={e=> setSlot(v=> v?{...v, end:e.target.value}:v)}/></div>
+              </div>
+              <div className="rounded-xl border p-3">
+                <div className="text-sm font-medium mb-2" style={color:'#0B0B0C'}>Details</div>
+                <div className="text-xs text-gray-500 mb-2">Pick location, add notes, attach file in the form below.</div>
+                <div className="mt-3">
+                  <RequestForm
+                    defaultWarehouseId={1}
+                    onSubmitted={()=> setShowModal(false)}
+                  />
+                </div>
+              </div>
+            </div>
+          </Modal>
+        </div>
+      </div>
+
+      {/* Create modal */}
+      <Modal open={createModal.open} onClose={()=>setCreateModal({open:false})}>
+        <h3 className="text-lg font-semibold mb-3">Create Request</h3>
+        <RequestForm
+          defaultDate={createModal.date}
+          defaultStart={createModal.start}
+          defaultEnd={createModal.end}
+        />
+      </Modal>
+
+      {/* Details modal */}
+      <Modal open={viewModal.open} onClose={()=>setViewModal({open:false})}>
+        <h3 className="text-lg font-semibold mb-3">Request Details</h3>
+        {viewModal.row ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2">
+              {viewModal.row.driver_photo_url
+                ? <img className="avatar" src={viewModal.row.driver_photo_url} alt="driver"/> 
+                : <div className="avatar" />}
+              <div className="font-semibold">{viewModal.row.driver_name ?? 'Driver TBC'}</div>
+            </div>
+            <div><b>Status:</b> {viewModal.row.status}</div>
+            <div><b>When:</b> {viewModal.row.date} {viewModal.row.start_time?.slice(0,5)}–{viewModal.row.end_time?.slice(0,5)}</div>
+            <div><b>Warehouse:</b> W#{viewModal.row.warehouse_id}{viewModal.row.dock_id ? ` / Dock ${viewModal.row.dock_id}`: ''}</div>
+            {viewModal.row.delivery_location && <div><b>Location:</b> {viewModal.row.delivery_location}</div>}
+            {viewModal.row.vehicle_plate && <div><b>Vehicle:</b> {viewModal.row.vehicle_plate}</div>}
+            {viewModal.row.notes && <div><b>Notes:</b> {viewModal.row.notes}</div>}
+            {viewModal.row.attachment_path ? (
+              <div className="pt-2">
+                <b>Attachment:</b>{' '}
+                {viewModal.signedUrl
+                  ? <a className="text-blue-600 underline" href={viewModal.signedUrl} target="_blank" rel="noreferrer">Download</a>
+                  : <span className="text-neutral-500">Generating link…</span>}
+              </div>
+            ) : <div className="text-neutral-500">No attachment</div>}
+          </div>
+        ) : <div>Loading…</div>}
+      </Modal>
+    </>
+  )
+}
