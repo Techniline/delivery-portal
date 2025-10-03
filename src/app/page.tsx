@@ -1,5 +1,7 @@
 import AuthGate from '@/components/AuthGate'
-import CalendarView
+import CalendarView from '@/components/CalendarView'
+import LegendChips from '@/components/LegendChips'
+
 import LegendChips from '@/components/LegendChips' from '@/components/CalendarView'
 
 export default function Page() {
