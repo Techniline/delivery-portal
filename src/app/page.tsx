@@ -1,3 +1,4 @@
+'use client'
 import AuthGate from '@/components/AuthGate'
 import CalendarView from '@/components/CalendarView'
 import LegendChips from '@/components/LegendChips'
