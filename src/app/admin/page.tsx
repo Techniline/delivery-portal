@@ -15,22 +15,18 @@ export default function AdminPage() {
           <h2 className="page-title">Holidays & Closures</h2>
           <HolidaysPanel />
         </section>
-
         <section>
           <h2 className="page-title">Business Hours</h2>
           <HoursPanel />
         </section>
-
         <section>
           <h2 className="page-title">Breaks</h2>
           <BreaksPanel />
         </section>
-
         <section>
           <h2 className="page-title">Fleet</h2>
           <FleetPanel />
         </section>
-
         <section>
           <h2 className="page-title">Users</h2>
           <UsersPanel />
