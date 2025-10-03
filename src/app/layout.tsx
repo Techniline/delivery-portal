@@ -1,34 +1,28 @@
 import './globals.css'
-import '@/styles/fc-core.css'
-import '@/styles/fc-timegrid.css'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Techniline Delivery Schedule Portal',
-  description: 'Modern slot scheduling, approvals, and admin controls',
+  description: 'Vehicle slot scheduling with approvals',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      {/* suppressHydrationWarning prevents browser-injected attributes (e.g., Grammarly) from causing hydration mismatches */}
-      <body suppressHydrationWarning>
+    <html lang="en">
+      <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/index.global.min.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.15/index.global.min.css" />
+      </head>
+      <body>
         <header className="topbar">
           <div className="container-app py-3 flex items-center gap-6">
-            <Link href="/" className="brand" aria-label="Techniline Delivery Schedule Portal">
-              <div className="brand-badge" />
-              <div>
-                <div className="text-base leading-tight">Techniline</div>
-                <div className="text-xs opacity-70 -mt-0.5">Delivery Schedule Portal</div>
-              </div>
-            </Link>
-            <nav className="nav ml-auto">
-              <Link href="/" className="active">Calendar</Link>
-              <Link href="/requests">My Requests</Link>
-              <Link href="/approvals">Approvals</Link>
-              <Link href="/admin">Admin</Link>
-              <Link href="/signout" className="btn btn-outline ml-2">Sign out</Link>
+            <Link href="/" className="brand">Techniline Delivery Schedule Portal</Link>
+            <nav className="flex items-center gap-4 ml-auto">
+              <Link href="/" className="navlink">Calendar</Link>
+              <Link href="/requests" className="navlink">My Requests</Link>
+              <Link href="/approvals" className="navlink">Approvals</Link>
+              <Link href="/admin" className="navlink">Admin</Link>
             </nav>
           </div>
         </header>

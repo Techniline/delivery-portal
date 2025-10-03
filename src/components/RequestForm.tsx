@@ -1,190 +1,74 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-
-const LOCATIONS = [
-  'Al Shoala Showroom',
-  'MusicMajlis',
-  'Amazon Delivery',
-  'B2B',
-  'Soundline Main',
-  'Other Delivery',
-  'Showroom Delivery',
-]
-
-type Props = {
-  defaultWarehouseId?: number
-  initialDate?: string  // 'YYYY-MM-DD'
-  initialStart?: string // 'HH:mm'
-  initialEnd?: string   // 'HH:mm'
-  onSubmitted?: () => void
-}
-
-export default function RequestForm({
-  defaultWarehouseId = 1,
-  initialDate,
-  initialStart,
-  initialEnd,
-  onSubmitted,
-}: Props) {
-  // form state
-  const [date, setDate] = useState(initialDate ?? new Date().toISOString().slice(0, 10))
-  const [start, setStart] = useState(initialStart ?? '10:00')
-  const [end, setEnd] = useState(initialEnd ?? '11:00')
+const LOCATIONS = ['Al Shoala Showroom','MusicMajlis','Amazon Delivery','B2B','Soundline Main','Other Delivery','Showroom Delivery'] as const
+type Props = { defaultWarehouseId?: number; prefill?: { date:string; start:string; end:string } | null; onSubmitted?: () => void }
+export default function RequestForm({ defaultWarehouseId=1, prefill, onSubmitted }: Props) {
+  const today = new Date().toISOString().slice(0,10)
+  const [date, setDate] = useState(prefill?.date ?? today)
+  const [start, setStart] = useState(prefill?.start ?? '10:00')
+  const [end, setEnd] = useState(prefill?.end ?? '11:00')
   const [warehouseId, setWarehouseId] = useState<number>(defaultWarehouseId)
-  const [dockId, setDockId] = useState<number | ''>('')
-  const [location, setLocation] = useState<string>(LOCATIONS[0])
+  const [dockId, setDockId] = useState<number | undefined>()
+  const [deliveryLocation, setDeliveryLocation] = useState<string>(LOCATIONS[0])
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const timeOk = useMemo(()=> start < end, [start,end])
 
-  // quick duration buttons
-  const durations = [30, 60, 90, 120]
-  const timeOk = useMemo(() => {
-    return /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end) && end > start
-  }, [start, end])
-
-  function applyDuration(mins: number) {
-    if (!/^\d{2}:\d{2}$/.test(start)) return
-    const [h, m] = start.split(':').map(Number)
-    const t = h * 60 + m + mins
-    const eh = Math.floor(t / 60)
-    const em = t % 60
-    setEnd(String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0'))
-  }
-
-  async function onSubmit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent){
     e.preventDefault()
-    if (!timeOk) return
+    if (!timeOk || submitting) return
     setSubmitting(true)
-    try {
+    try{
       const s = supabase()
+      const start_ts = `${date}T${start}:00+04:00`
+      const end_ts   = `${date}T${end}:00+04:00`
       const payload = {
-        origin: 'SHOWROOM_REQUEST',
-        status: 'PENDING',
-        date,
-        start_time: start + ':00',
-        end_time: end + ':00',
-        start_ts: `${date}T${start}:00+04:00`,
-        end_ts: `${date}T${end}:00+04:00`,
-        warehouse_id: warehouseId,
-        dock_id: dockId === '' ? null : Number(dockId),
-        delivery_location: location,
-        notes,
+        origin:'SHOWROOM_REQUEST', status:'PENDING',
+        date, start_time:`${start}:00`, end_time:`${end}:00`,
+        start_ts, end_ts, warehouse_id: warehouseId, dock_id: dockId ?? null,
+        delivery_location: deliveryLocation, notes
       }
       const { error } = await s.from('bookings').insert(payload)
       if (error) throw error
-      // toast-lite
-      try { (window as any).alert?.('Request submitted') } catch {}
-      onSubmitted?.() // <-- closes the modal
-    } catch (err: any) {
-      alert(err.message || 'Failed to submit')
-    } finally {
-      setSubmitting(false)
-    }
+      onSubmitted?.()
+    } catch(err:any){ alert(err.message || 'Failed to submit') }
+    finally{ setSubmitting(false) }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {durations.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => applyDuration(d)}
-            className="rounded-full border px-3 py-1 text-sm hover:bg-black/5"
-          >
-            {d}m
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="col-span-2">
-          <div className="text-xs mb-1">Date</div>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
+    <form onSubmit={submit} className="grid gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <label className="grid gap-1"><span className="text-sm font-medium">Date</span>
+          <input type="date" className="input" value={date} onChange={e=>setDate(e.target.value)} />
         </label>
-
-        <label>
-          <div className="text-xs mb-1">Start</div>
-          <input
-            type="time"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-
-        <label>
-          <div className="text-xs mb-1">End</div>
-          <input
-            type="time"
-            value={end}
-            onChange={(e) => setEnd(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-
-        <label>
-          <div className="text-xs mb-1">Warehouse</div>
-          <input
-            type="number"
-            min={1}
-            value={warehouseId}
-            onChange={(e) => setWarehouseId(Number(e.target.value || 1))}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-
-        <label>
-          <div className="text-xs mb-1">Dock (optional)</div>
-          <input
-            placeholder="e.g. 1"
-            value={dockId}
-            onChange={(e) => setDockId(e.target.value === '' ? '' : Number(e.target.value))}
-            className="w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-
-        <label className="col-span-2">
-          <div className="text-xs mb-1">Location</div>
-          <select
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-          >
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="col-span-2">
-          <div className="text-xs mb-1">Notes</div>
-          <textarea
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2"
-            placeholder="Anything the warehouse should know..."
-          />
-        </label>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className={`text-xs ${timeOk ? 'text-emerald-600' : 'text-red-600'}`}>
-          {timeOk ? 'Time OK' : 'End must be after Start'}
+        <div className="grid grid-cols-2 gap-4">
+          <label className="grid gap-1"><span className="text-sm font-medium">Start</span>
+            <input type="time" className="input" value={start} onChange={e=>setStart(e.target.value)} />
+          </label>
+          <label className="grid gap-1"><span className="text-sm font-medium">End</span>
+            <input type="time" className="input" value={end} onChange={e=>setEnd(e.target.value)} />
+          </label>
         </div>
-        <button
-          disabled={submitting || !timeOk}
-          className={`rounded-xl bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-500 ${
-            submitting || !timeOk ? 'opacity-60 cursor-not-allowed' : ''
-          }`}
-        >
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="grid gap-1"><span className="text-sm font-medium">Warehouse</span>
+          <input type="number" className="input" value={warehouseId} onChange={e=>setWarehouseId(parseInt(e.target.value||'1',10))} />
+        </label>
+        <label className="grid gap-1"><span className="text-sm font-medium">Dock (optional)</span>
+          <input type="number" className="input" value={dockId ?? ''} onChange={e=>setDockId(e.target.value ? parseInt(e.target.value,10) : undefined)} />
+        </label>
+      </div>
+      <label className="grid gap-1"><span className="text-sm font-medium">Delivery location</span>
+        <select className="input" value={deliveryLocation} onChange={e=>setDeliveryLocation(e.target.value)}>
+          {LOCATIONS.map(loc => <option key={loc} value={loc}>{loc}</option>)}
+        </select>
+      </label>
+      <label className="grid gap-1"><span className="text-sm font-medium">Notes</span>
+        <textarea className="input" rows={3} value={notes} onChange={e=>setNotes(e.target.value)} />
+      </label>
+      <div className="flex items-center gap-3 justify-end pt-2">
+        <button type="submit" disabled={submitting || !timeOk} className={`btn btn-primary ${submitting?'opacity-60 cursor-not-allowed':''}`}>
           {submitting ? 'Requesting…' : 'Request Slot'}
         </button>
       </div>

@@ -1,262 +1,167 @@
 'use client'
-
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { format, parseISO } from 'date-fns'
 import { supabase } from '@/lib/supabaseClient'
-
 import Modal from './Modal'
-import QuickSlotPicker from './QuickSlotPicker'
 import RequestForm from './RequestForm'
+import { format, parseISO } from 'date-fns'
 
-type BookingRow = {
-  id:number
-  origin:'SHOWROOM_REQUEST'|'WAREHOUSE_BOOKING'
-  status:'PENDING'|'APPROVED'|'REJECTED'|'CANCELLED'
-  creator_user_id:string
-  date:string
-  start_time:string
-  end_time:string
-  start_ts?:string
-  end_ts?:string
-  warehouse_id:number
-  dock_id:number|null
-  delivery_location?:string|null
-  notes?:string|null
-  driver_name?:string|null
-  driver_photo_url?:string|null
-  vehicle_plate?:string|null
-  vehicle_model?:string|null
+type Booking = {
+  id: number
+  origin: 'SHOWROOM_REQUEST'|'WAREHOUSE_BOOKING'
+  status: 'PENDING'|'APPROVED'|'REJECTED'|'CANCELLED'
+  date: string; start_time: string; end_time: string
+  start_ts: string; end_ts: string
+  warehouse_id: number; dock_id: number|null
+  driver_name?: string|null; driver_photo_url?: string|null
+  vehicle_plate?: string|null; vehicle_model?: string|null
+  delivery_location?: string|null; notes?: string|null
+  creator_user_id: string
 }
 
-const LOCATION_COLORS: Record<string, string> = {
-  'Al Shoala Showroom':'#2563EB',
-  'MusicMajlis':'#9333EA',
-  'Amazon Delivery':'#4F46E5',
-  'B2B':'#0EA5E9',
-  'Soundline Main':'#059669',
-  'Other Delivery':'#6B7280',
-  'Showroom Delivery':'#EF4444',
-}
 export default function CalendarView() {
-  const [locFilter, setLocFilter] = useState<string>('All')
   const s = supabase()
   const calRef = useRef<any>(null)
 
-  const [bookings, setBookings] = useState<BookingRow[]>([])
-  const [uid, setUid] = useState<string | null>(null)
-  const [role, setRole] = useState<string>('')
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [biz, setBiz] = useState<any[]>([])
+  const [brk, setBrk] = useState<any[]>([])
 
-  // Modal / slot state
   const [showModal, setShowModal] = useState(false)
-  const [slot, setSlot] = useState<{date:string, start:string, end:string} | null>(null)
+  const [prefill, setPrefill] = useState<{date:string,start:string,end:string} | null>(null)
+  const openModal = (slot?:{date:string,start:string,end:string}) => { setPrefill(slot ?? null); setShowModal(true) }
+  const closeModal = () => setShowModal(false)
 
-  // Helpers
-  const pad = (n:number) => String(n).padStart(2,'0')
-  const toISODate = (d:Date) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
-  const toHHMM = (d:Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  async function loadAll() {
+    const u = await s.auth.getUser()
+    const uid = u.data.user?.id
+    const [a1,a2,a3] = await Promise.all([
+      s.from('bookings').select('*').or(`status.eq.APPROVED,creator_user_id.eq.${uid}`),
+      s.from('business_hours').select('*'),
+      s.from('business_breaks').select('*')
+    ])
+    setBookings(a1.data || [])
+    setBiz(a2.data || [])
+    setBrk(a3.data || [])
+  }
+  useEffect(()=>{ loadAll() },[])
 
-  // Load auth + role
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await s.auth.getUser()
-      setUid(user?.id ?? null)
-      if (user?.id) {
-        const { data: prof } = await s.from('profiles').select('role').eq('user_id', user.id).maybeSingle()
-        setRole(prof?.role ?? '')
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Load bookings (approved + mine)
-  async function loadBookings() {
-    const mineFilter = uid ? s.from('bookings').select('*').eq('creator_user_id', uid) : null
-    const { data: approved } = await s.from('bookings').select('*').eq('status','APPROVED')
-    let mine: BookingRow[] = []
-    if (mineFilter) {
-      const { data } = await mineFilter
-      mine = data || []
+  const businessHours = useMemo(() => {
+    if (!biz?.length) return [{ daysOfWeek:[1,2,3,4,5,6], startTime:'09:00', endTime:'18:00' }]
+    const map = new Map<number, {start:string,end:string}>()
+    for (const r of biz) {
+      const d = Number(r.weekday)
+      const st = (r.start_time||'09:00:00').slice(0,5)
+      const et = (r.end_time||'18:00:00').slice(0,5)
+      map.set(d, { start: st, end: et })
     }
-    // merge unique by id
-    const map = new Map<number, BookingRow>()
-    for (const b of (approved || [])) map.set(b.id, b)
-    for (const b of mine) map.set(b.id, b)
-    setBookings([...map.values()])
+    const out:any[] = []
+    for (let d=0; d<7; d++){
+      if (map.has(d)) { const { start, end } = map.get(d)!; out.push({ daysOfWeek:[d], startTime:start, endTime:end }) }
+    }
+    return out.length ? out : [{ daysOfWeek:[1,2,3,4,5,6], startTime:'09:00', endTime:'18:00' }]
+  }, [JSON.stringify(biz)])
+
+  const hiddenDays = useMemo(() => {
+    const openDays = new Set<number>()
+    businessHours.forEach((b:any)=> (b.daysOfWeek||[]).forEach((d:number)=>openDays.add(d)))
+    const out:number[] = []
+    for (let d=0; d<7; d++) if (!openDays.has(d)) out.push(d)
+    return out
+  }, [JSON.stringify(businessHours)])
+
+  const slotMinTime = useMemo(() => {
+    const mins:number[] = []; businessHours.forEach((b:any)=>{ const [hh,mm]=(b.startTime||'09:00').split(':').map(Number); mins.push(hh*60+mm) })
+    if (!mins.length) return '09:00:00'
+    const v = Math.min(...mins); const hh=String(Math.floor(v/60)).padStart(2,'0'); const mm=String(v%60).padStart(2,'0'); return `${hh}:${mm}:00`
+  }, [JSON.stringify(businessHours)])
+
+  const slotMaxTime = useMemo(() => {
+    const mins:number[] = []; businessHours.forEach((b:any)=>{ const [hh,mm]=(b.endTime||'18:00').split(':').map(Number); mins.push(hh*60+mm) })
+    if (!mins.length) return '19:00:00'
+    const v = Math.max(...mins); const hh=String(Math.floor(v/60)).padStart(2,'0'); const mm=String(v%60).padStart(2,'0'); return `${hh}:${mm}:00`
+  }, [JSON.stringify(businessHours)])
+
+  const events = useMemo(() => bookings.map(b => ({
+    id: String(b.id),
+    title: b.driver_name || (b.origin==='WAREHOUSE_BOOKING' ? 'Warehouse booking' : 'Request'),
+    start: b.start_ts, end: b.end_ts, extendedProps: b
+  })), [bookings])
+
+  function renderEvent(arg:any){
+    const b = arg.event.extendedProps as Booking
+    const when = `${format(parseISO(arg.event.startStr),'HH:mm')}–${format(parseISO(arg.event.endStr),'HH:mm')}`
+    const title = b.delivery_location || (b.origin==='WAREHOUSE_BOOKING' ? 'Warehouse' : 'Request')
+    const driver = b.driver_name || 'Driver'
+    const plate = b.vehicle_plate || ''
+    const model = b.vehicle_model ? `• ${b.vehicle_model}` : ''
+    const loc   = b.delivery_location ? ` • ${b.delivery_location}` : ''
+    const status = b.status
+    const chip = document.createElement('div')
+    chip.className = 'event-chip'
+    chip.innerHTML = `
+      <div class="stripe" style="background:${status==='APPROVED' ? '#10B981' : status==='REJECTED' ? '#EF4444' : '#9CA3AF'}"></div>
+      <div class="avatar">${b.driver_photo_url ? `<img src="${b.driver_photo_url}" alt="driver"/>` : ''}</div>
+      <div class="meta">
+        <div class="title">${title} • ${when}</div>
+        <div class="driver-name">${driver}</div>
+        <div class="sub">${plate} ${model} ${loc}</div>
+      </div>`
+    return { domNodes: [chip] }
   }
 
-  useEffect(() => { loadBookings() }, [uid]) // reload when we know uid
-
-  // Build calendar events
-  const events = useMemo(() => {
-    return bookings.map(b => {
-      const start = b.start_ts ?? `${b.date}T${b.start_time?.slice(0,5) || '00:00'}:00+04:00`
-      const end   = b.end_ts   ?? `${b.date}T${b.end_time?.slice(0,5)   || '00:00'}:00+04:00`
-      const title =
-        b.status === 'APPROVED'
-          ? (b.driver_name || b.vehicle_plate || 'Approved Slot')
-          : 'Pending Request'
-      return {
-        id: String(b.id),
-        title,
-        start,
-        end,
-        extendedProps: {
-          ...b
-        }
-      }
-    })
-  }, [bookings])
-
-  // Pretty event pills
-  function renderEvent(arg:any) {
-    const s = arg.event.extendedProps as BookingRow
-    const when = `${format(parseISO(arg.event.startStr), 'HH:mm')}–${format(parseISO(arg.event.endStr), 'HH:mm')}`
-    const driver = s.driver_name || 'Driver TBC'
-    const vehPlate = s.vehicle_plate ? `<span class="meta-pill">${s.vehicle_plate}</span>` : ''
-    const vehModel = s.vehicle_model ? `<span class="meta-pill">${s.vehicle_model}</span>` : ''
-    const locSlug = (s.delivery_location||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')
-    const locPill = s.delivery_location ? `<span class="loc-pill loc-${locSlug}">${s.delivery_location}</span>` : ''
-    const status = (s.status || 'PENDING').toUpperCase()
-    const stripeColor = status==='APPROVED' ? '#10B981' : status==='REJECTED' ? '#EF4444' : '#6B7280'
-    const avatar = s.driver_photo_url
-      ? `<img class="avatar" src="${s.driver_photo_url}" alt="driver">`
-      : `<div class="avatar"></div>`
-    const html =
-      `<div class="event-chip">
-         <div class="stripe" style="background:${stripeColor}"></div>
-         ${avatar}
-         <div style="display:flex; flex-direction:column; gap:4px; min-width:0">
-           <div class="title">${when}</div>
-           <div class="driver-name">${driver}</div>
-           <div class="sub">${vehPlate} ${vehModel} ${locPill}</div>
-         </div>
-       </div>`
-    return { html }
+  function onSelect(info:any){
+    const d = (x:Date)=> x.toISOString().slice(0,10)
+    const hm = (x:Date)=> String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0')
+    openModal({ date: d(info.start), start: hm(info.start), end: hm(info.end) })
   }
 
-  // Calendar interactions -> open modal
-  const openNew = (start:Date, end?:Date) => {
-    const s = new Date(start)
-    const e = end ? new Date(end) : new Date(s.getTime() + 60*60000)
-    setSlot({ date: toISODate(s), start: toHHMM(s), end: toHHMM(e) })
-    setShowModal(true)
+  async function handleSubmitted(){
+    setShowModal(false)
+    await loadAll()
+    if (prefill && calRef.current) {
+      const api = calRef.current.getApi?.() || calRef.current
+      api?.gotoDate?.(prefill.date)
+    }
   }
 
   return (
     <div className="card">
-      {/* top toolbar */}
       <div className="card-header">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold" style={{color:'#0B0B0C'}}>Schedule</h2>
-          <button
-            className="btn btn-primary"
-            onClick={() => openNew(new Date())}
-            aria-label="New Request"
-          >
-            + New Request
-          </button>
+          <h2 className="font-semibold">Schedule</h2>
+          <button className="btn btn-primary" onClick={()=>openModal(null)}>+ New Request</button>
         </div>
       </div>
-
       <div className="card-body">
-        {/* Legend (optional) */}
-        <div className="legend mb-4">
-          <span className="legend-title">Legend:</span>
-          <span className="legend-chip loc-al-shoala-showroom">Al Shoala Showroom</span>
-          <span className="legend-chip loc-musicmajlis">MusicMajlis</span>
-          <span className="legend-chip loc-amazon-delivery">Amazon Delivery</span>
-          <span className="legend-chip loc-b2b">B2B</span>
-          <span className="legend-chip loc-soundline-main">Soundline Main</span>
-          <span className="legend-chip loc-other-delivery">Other Delivery</span>
-          <span className="legend-chip loc-showroom-delivery">Showroom Delivery</span>
-        </div>
-
-        <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="text-sm">
-                <span className="mr-2 text-gray-500">Legend:</span>
-                {Object.entries(LOCATION_COLORS).map(([name,color])=>(
-                  <span key={name} className="inline-flex items-center gap-2 mr-2 text-xs rounded-full px-2 py-1"
-                        style={{background: color, color:'#fff'}}>
-                    {name}
-                  </span>
-                ))}
-              </div>
-              <div>
-                <select value={locFilter} onChange={(e)=>setLocFilter(e.target.value)}
-                        className="rounded-full border px-3 py-1 text-sm">
-                  <option>All</option>
-                  {Object.keys(LOCATION_COLORS).map(n=> <option key={n}>{n}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="rounded-2xl overflow-hidden border"  style={{borderColor:'var(--line)'}}>
+        <div className="rounded-2xl overflow-hidden border" style={{borderColor:'var(--line)'}}>
           <FullCalendar
             ref={(r:any)=> (calRef.current = r)}
             plugins={[timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
-            headerToolbar={{ left:'', center:'', right:'' }}  // only Week + Today via our own UI if needed
+            headerToolbar={{ left:'', center:'', right:'today prev,next' }}
             nowIndicator
             timeZone="Asia/Dubai"
-            slotMinTime="08:00:00"
-            slotMaxTime="20:00:00"
-            events={locFilter==='All' ? events : events.filter((e:any)=> (e.extendedProps?.delivery_location||'')===locFilter)}
-            eventContent={renderEvent}
             selectable
-            dateClick={(info:any)=> openNew(info.date)}
-            select={(info:any)=> openNew(info.start, info.end)}
+            select={onSelect}
+            businessHours={businessHours}
+            hiddenDays={hiddenDays.length ? (hiddenDays as any) : undefined}
+            slotMinTime={slotMinTime}
+            slotMaxTime={slotMaxTime}
+            events={events}
+            eventContent={renderEvent}
             height="auto"
           />
         </div>
       </div>
 
-      {/* Modal with form (auto-closes on submit via onSubmitted) */}
-      <Modal open={showModal} onClose={()=>setShowModal(false)} title="New Request">
-        <div className="space-y-4">
-          {/* quick duration chips */}
-          <QuickSlotPicker onPick={(mins)=>{
-            if (!slot) return
-            const base = new Date(`${slot.date}T${slot.start}:00`)
-            const e = new Date(base.getTime() + mins*60000)
-            setSlot({ ...slot, end: `${pad(e.getHours())}:${pad(e.getMinutes())}` })
-          }}/>
-          {/* basic slot editors */}
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <div className="label">Date</div>
-              <input className="input" type="date" value={slot?.date||''}
-                     onChange={e=> setSlot(v=> v ? { ...v, date:e.target.value } : v)} />
-            </div>
-            <div>
-              <div className="label">Start</div>
-              <input className="input" type="time" value={slot?.start||''}
-                     onChange={e=> setSlot(v=> v ? { ...v, start:e.target.value } : v)} />
-            </div>
-            <div>
-              <div className="label">End</div>
-              <input className="input" type="time" value={slot?.end||''}
-                     onChange={e=> setSlot(v=> v ? { ...v, end:e.target.value } : v)} />
-            </div>
-          </div>
-
-          {/* The actual submit form; it reads from its own fields but will close this modal on success */}
-          <RequestForm
-            defaultWarehouseId={1}
-            onSubmitted={()=>{
-              setShowModal(false)
-              loadBookings() // refresh calendar after submit
-            }}
-          />
-        </div>
-      </Modal>
-    
       {showModal && (
         <Modal title="New Request" onClose={closeModal}>
-          <RequestForm onSubmitted={closeModal} />
+          <RequestForm prefill={prefill} onSubmitted={handleSubmitted} />
         </Modal>
       )}
-</div>
+    </div>
   )
 }
