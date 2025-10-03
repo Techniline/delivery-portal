@@ -23,6 +23,15 @@ function parseHM(t?: string): { h: number, m: number } | null {
   return { h: parseInt(m[1], 10), m: parseInt(m[2], 10) }
 }
 
+
+  // listen for top legend chip filter
+  const [activeLocations, setActiveLocations] = useState<string[]|null>(null)
+  useEffect(()=>{
+    const on = (e:any)=> setActiveLocations(e.detail || [])
+    window.addEventListener('location-filter', on as any)
+    return ()=> window.removeEventListener('location-filter', on as any)
+  },[])
+
 export default function CalendarView() {
   const calRef = useRef<any>(null)
 
@@ -195,6 +204,9 @@ export default function CalendarView() {
       <div className="card-body">
         <div className="rounded-2xl overflow-hidden border" style={{ borderColor: 'var(--line)' }}>
           <FullCalendar
+              eventDidMount={(info:any)=>{
+                try{const loc=(info.event.extendedProps?.delivery_location||'').toString(); const list=activeLocations||[]; if(list.length && (!loc || !list.includes(loc))){ info.el.style.display='none'; return; }}catch{}
+              }}
             ref={(r: any) => (calRef.current = r)}
             plugins={[timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
