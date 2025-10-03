@@ -32,6 +32,8 @@ function parseHM(t?: string): { h: number, m: number } | null {
     return ()=> window.removeEventListener('location-filter', on as any)
   },[])
 
+const [holidays, setHolidays] = useState<any[]>([])
+
 export default function CalendarView() {
   const calRef = useRef<any>(null)
 
@@ -213,9 +215,26 @@ export default function CalendarView() {
             headerToolbar={{ left: '', center: '', right: '' }}
             timeZone="Asia/Dubai"
             selectable
+              selectAllow={(info:any)=>{
+                const d = info.start
+                const iso = d.toISOString().slice(0,10)
+                // holiday block
+                const hit = (holidays||[]).some((h:any)=> iso >= h.start_date && iso <= h.end_date && h.is_closed)
+                if (hit) return false
+                return true
+              }}
             selectMirror
             select={onSelect}
-            events={events}
+            eventSources={[
+                { events },
+                { events: (fetchInfo: any, success: any)=>{
+                    const out = (holidays||[]).map((h:any)=>({
+                      start: h.start_date,
+                      end: (new Date(new Date(h.end_date).getTime()+24*3600*1000)).toISOString().slice(0,10),
+                      display: 'background', className: 'holiday-bg'
+                    })); success(out)
+                  } }
+              ]}
             eventContent={renderEvent}
             businessHours={businessHours as any}
             hiddenDays={hiddenDays.length ? (hiddenDays as any) : undefined}

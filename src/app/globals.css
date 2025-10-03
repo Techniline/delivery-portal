@@ -204,3 +204,13 @@ html,body{ height:100%; background:var(--bg); color:var(--ink); }
 
 /* “+ New Request” button alignment */
 .actions-row{ display:flex; align-items:center; gap:10px; justify-content:flex-end; margin-bottom:10px; }
+
+/* admin utility tokens */
+.lbl{ display:block; font-size:.85rem; color:#6B7280; margin-bottom:.25rem }
+.inp{ width:100%; border:1px solid #E5E7EB; border-radius:.75rem; padding:.5rem .75rem }
+.btn-primary{ background:#111827; color:#fff; border-radius:.75rem; padding:.5rem .9rem; font-weight:700 }
+.btn-outline{ border:1px solid #E5E7EB; border-radius:.75rem; padding:.4rem .75rem; font-weight:700 }
+.card{ border:1px solid #E5E7EB; border-radius:1rem; background:#fff; }
+.card-header{ padding:.9rem 1rem; border-bottom:1px solid #E5E7EB }
+.card-body{ padding:1rem }
+.holiday-bg{ background: repeating-linear-gradient(45deg, #FEE2E2, #FEE2E2 8px, #FFF 8px, #FFF 16px) !important; }
