@@ -1,0 +1,299 @@
+'use client'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import FullCalendar from '@fullcalendar/react'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import { supabase } from '@/lib/supabaseClient'
+import Modal from './Modal'
+import RequestForm from './RequestForm'
+import { format, parseISO } from 'date-fns'
+
+type Booking = {
+  id: number
+  origin: 'SHOWROOM_REQUEST'|'WAREHOUSE_BOOKING'
+  status: 'PENDING'|'APPROVED'|'REJECTED'|'CANCELLED'
+  date: string; start_time: string; end_time: string
+  start_ts: string; end_ts: string
+  warehouse_id: number; dock_id: number|null
+  driver_name?: string|null
+  driver_photo_url?: string|null
+  vehicle_plate?: string|null
+  vehicle_model?: string|null
+  delivery_location?: string|null
+  notes?: string|null
+  creator_user_id: string
+}
+
+
+  // Slot min/max from business hours (safe, deduped)
+  const slotMinTime = useMemo(() => {
+    try {
+      const mins: number[] = []
+      ;(businessHours || []).forEach((r: any) => {
+        const t = (r.open_time || r.openTime || '').toString()
+        if (/^\d{2}:\d{2}/.test(t)) {
+          const [h, m] = t.split(':').map((x: string) => parseInt(x, 10))
+          mins.push(h * 60 + m)
+        }
+      })
+      if (!mins.length) return '08:00:00'
+      const v = Math.min(...mins)
+      const hh = String(Math.floor(v / 60)).padStart(2, '0')
+      const mm = String(v % 60).padStart(2, '0')
+      return `${hh}:${mm}:00`
+    } catch {
+      return '08:00:00'
+    }
+  }, [JSON.stringify(businessHours)])
+
+  const slotMaxTime = useMemo(() => {
+    try {
+      const maxs: number[] = []
+      ;(businessHours || []).forEach((r: any) => {
+        const t = (r.close_time || r.closeTime || '').toString()
+        if (/^\d{2}:\d{2}/.test(t)) {
+          const [h, m] = t.split(':').map((x: string) => parseInt(x, 10))
+          maxs.push(h * 60 + m)
+        }
+      })
+      if (!maxs.length) return '19:00:00'
+      const v = Math.max(...maxs)
+      const hh = String(Math.floor(v / 60)).padStart(2, '0')
+      const mm = String(v % 60).padStart(2, '0')
+      return `${hh}:${mm}:00`
+    } catch {
+      return '19:00:00'
+    }
+  }, [JSON.stringify(businessHours)])
+
+  // Days fully closed -> hiddenDays
+  const hiddenDays = useMemo(() => {
+    try {
+      const seen = new Set<number>()
+      const open = new Set<number>()
+      ;(businessHours || []).forEach((r: any) => {
+        const wd = typeof r.weekday === 'number' ? r.weekday : parseInt(String(r.weekday||0),10)
+        if (Number.isFinite(wd)) seen.add(wd)
+        const hasOpen = !!(r.open_time || r.openTime)
+        const hasClose = !!(r.close_time || r.closeTime)
+        if (hasOpen && hasClose) open.add(wd)
+      })
+      const out: number[] = []
+      for (let d = 0; d < 7; d++) {
+        if (seen.has(d) && !open.has(d)) out.push(d)
+      }
+      return out
+    } catch {
+      return []
+    }
+  }, [JSON.stringify(businessHours)])
+
+
+export default function CalendarView() {
+  // ===== BEGIN calendar guards (single source of truth) =====
+  // Use your existing businessHours if present; otherwise treat as empty.
+  // We compute hiddenDays (closed days) and slotMin/slotMax from businessHours.
+
+  // @ts-ignore
+  const biz: any[] = (typeof businessHours !== 'undefined' && Array.isArray(businessHours)) ? (businessHours as any[]) : [];
+
+  const safeHiddenDays = useMemo(() => {
+    try {
+      const seen = new Set<number>();
+      const open = new Set<number>();
+      for (const r of biz) {
+        const days: number[] = Array.isArray((r as any).daysOfWeek)
+          ? (r as any).daysOfWeek
+          : (typeof (r as any).weekday === 'number' ? [(r as any).weekday] : []);
+        const st = (r as any).startTime ?? (r as any).start_time;
+        const et = (r as any).endTime   ?? (r as any).end_time;
+        for (const d of days) {
+          if (d >= 0 && d <= 6) {
+            seen.add(d);
+            if (st && et) open.add(d);
+          }
+        }
+      }
+      const out: number[] = [];
+      for (let d = 0; d < 7; d++) if (seen.has(d) && !open.has(d)) out.push(d);
+      return out;
+    } catch (e) {
+      return [];
+    }
+  }, [JSON.stringify(biz)]);
+vals.push(Number(h)*3600 + Number(m)*60 + Number(s));
+        }
+      }
+      if (!vals.length) return '08:00:00';
+      const v = Math.min(...vals);
+      const hh = String(Math.floor(v/3600)).padStart(2,'0');
+      const mm = String(Math.floor((v%3600)/60)).padStart(2,'0');
+      return `${hh}:${mm}:00`;
+    } catch (e) {
+      return '08:00:00';
+    }
+  }, [JSON.stringify(biz)]);
+vals.push(Number(h)*3600 + Number(m)*60 + Number(s));
+        }
+      }
+      if (!vals.length) return '20:00:00';
+      const v = Math.max(...vals);
+      const hh = String(Math.floor(v/3600)).padStart(2,'0');
+      const mm = String(Math.floor((v%3600)/60)).padStart(2,'0');
+      return `${hh}:${mm}:00`;
+    } catch (e) {
+      return '20:00:00';
+    }
+  }, [JSON.stringify(biz)]);
+  // ===== END calendar guards =====
+
+  const s = supabase()
+  const calRef = useRef<any>(null)
+
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [biz, setBiz] = useState<any[]>([])      // business hours rows
+  const [brk, setBrk] = useState<any[]>([])      // breaks rows
+
+  // Modal state + prefill from selection
+  const [showModal, setShowModal] = useState(false)
+  const [prefill, setPrefill] = useState<{date:string,start:string,end:string} | null>(null)
+  const openModal = (slot?:{date:string,start:string,end:string}) => { setPrefill(slot ?? null); setShowModal(true) }
+  const closeModal = () => setShowModal(false)
+
+  // Load bookings + hours/breaks
+  async function loadAll() {
+    const u = await s.auth.getUser()
+    const uid = u.data.user?.id
+
+    const [a1, a2, a3] = await Promise.all([
+      s.from('bookings').select('*').or(`status.eq.APPROVED,creator_user_id.eq.${uid}`),
+      s.from('business_hours').select('*'),
+      s.from('business_breaks').select('*')
+    ])
+    setBookings(a1.data || [])
+    setBiz(a2.data || [])
+    setBrk(a3.data || [])
+  }
+  useEffect(()=>{ loadAll() },[])
+
+  // Compute FullCalendar businessHours safely (fallback Mon–Sat 09:00–18:00)
+  const businessHours = useMemo(() => {
+    if (!biz?.length) {
+      return [
+        { daysOfWeek:[1,2,3,4,5,6], startTime:'09:00', endTime:'18:00' } // Mon–Sat
+      ]
+    }
+    // Expect rows like { weekday: 0-6, start_time:'HH:MM:SS', end_time:'HH:MM:SS' }
+    const map = new Map<number, {start:string,end:string}>()
+    for (const r of biz) {
+      const d = Number(r.weekday)
+      const st = (r.start_time||'09:00:00').slice(0,5)
+      const et = (r.end_time||'18:00:00').slice(0,5)
+      map.set(d, { start: st, end: et })
+    }
+    const out:any[] = []
+    for (let d=0; d<7; d++){
+      if (map.has(d)) {
+        const { start, end } = map.get(d)!
+        out.push({ daysOfWeek:[d], startTime:start, endTime:end })
+      }
+    }
+    return out.length ? out : [{ daysOfWeek:[1,2,3,4,5,6], startTime:'09:00', endTime:'18:00' }]
+  }, [JSON.stringify(biz)])
+
+  // Hide days with no business hours at all
+const mm=String(v%60).padStart(2,'0')
+    return `${hh}:${mm}:00`
+  }, [JSON.stringify(businessHours)])
+const hh=String(Math.floor(v/60)).padStart(2,'0'); const mm=String(v%60).padStart(2,'0')
+    return `${hh}:${mm}:00`
+  }, [JSON.stringify(businessHours)])
+
+  // Map bookings to FC events
+  const events = useMemo(() => bookings.map(b => ({
+    id: String(b.id),
+    title: b.driver_name || (b.origin==='WAREHOUSE_BOOKING' ? 'Warehouse booking' : 'Request'),
+    start: b.start_ts, end: b.end_ts,
+    extendedProps: b
+  })), [bookings])
+
+  // Pretty event chip (DOM-based)
+  function renderEvent(arg:any){
+    const b = arg.event.extendedProps as Booking
+    const when = `${format(parseISO(arg.event.startStr),'HH:mm')}–${format(parseISO(arg.event.endStr),'HH:mm')}`
+    const title = b.delivery_location || (b.origin==='WAREHOUSE_BOOKING' ? 'Warehouse' : 'Request')
+    const driver = b.driver_name || 'Driver'
+    const plate = b.vehicle_plate || ''
+    const model = b.vehicle_model ? `• ${b.vehicle_model}` : ''
+    const loc   = b.delivery_location ? ` • ${b.delivery_location}` : ''
+    const status = b.status
+    const chip = document.createElement('div')
+    chip.className = 'event-chip'
+    chip.innerHTML = `
+      <div class="stripe" style="background:${status==='APPROVED' ? '#10B981' : status==='REJECTED' ? '#EF4444' : '#9CA3AF'}"></div>
+      <div class="avatar">${b.driver_photo_url ? `<img src="${b.driver_photo_url}" alt="driver"/>` : ''}</div>
+      <div class="meta">
+        <div class="title">${title} • ${when}</div>
+        <div class="driver-name">${driver}</div>
+        <div class="sub">${plate} ${model} ${loc}</div>
+      </div>
+    `
+    return { domNodes: [chip] }
+  }
+
+  // Selecting a slot opens the modal prefilled
+  function onSelect(info:any){
+    const d = (x:Date)=> x.toISOString().slice(0,10)
+    const hm = (x:Date)=> String(x.getHours()).padStart(2,'0')+':'+String(x.getMinutes()).padStart(2,'0')
+    openModal({ date: d(info.start), start: hm(info.start), end: hm(info.end) })
+  }
+
+  // After submit: close modal, reload, and paint the pending request immediately
+  async function handleSubmitted(){
+    setShowModal(false)
+    await loadAll()
+    // Snap to selected date if available
+    if (prefill && calRef.current) {
+      const api = calRef.current.getApi?.() || calRef.current
+      api?.gotoDate?.(prefill.date)
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Schedule</h2>
+          <button className="btn btn-primary" onClick={()=>openModal(null)}>+ New Request</button>
+        </div>
+      </div>
+      <div className="card-body">
+        <div className="rounded-2xl overflow-hidden border" style={{borderColor:'var(--line)'}}>
+          <FullCalendar
+            ref={(r:any)=> (calRef.current = r)}
+            plugins={[timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            headerToolbar={{ left:'', center:'', right:'today prev,next' }}
+            nowIndicator
+            timeZone="Asia/Dubai"
+            selectable
+            select={onSelect}
+            businessHours={businessHours}
+            hiddenDays={(Array.isArray(hiddenDays) && hiddenDays.length ? (hiddenDays as any) : (safeHiddenDays.length ? (safeHiddenDays as any) : undefined))}
+            slotMinTime={slotMinTime}
+            slotMaxTime={slotMaxTime}
+            events={events}
+            eventContent={renderEvent}
+            height="auto"
+          />
+        </div>
+      </div>
+
+      {showModal && (
+        <Modal title="New Request" onClose={closeModal}>
+          <RequestForm prefill={prefill} onSubmitted={handleSubmitted} />
+        </Modal>
+      )}
+    </div>
+  )
+}

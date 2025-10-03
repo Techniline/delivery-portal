@@ -108,3 +108,55 @@ html,body{ height:100%; background:var(--bg); color:var(--ink); }
 .event-chip .title{ font-weight:800; font-size:12.5px; color:var(--ink); letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .event-chip .driver-name{ font-weight:800; font-size:12px; color:#111827; }
 .event-chip .sub{ font-size:12px; color:#6B7280; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+:root{ --brand:#C0101A; --brand-600:#A40D16; --ink:#0B0B0C; --line:#E5E7EB; }
+.container-app{ max-width:1100px; margin:0 auto; padding:0 1rem; }
+.topbar{ position:sticky; top:0; z-index:20; backdrop-filter:blur(6px); background:rgba(255,255,255,.9); border-bottom:1px solid var(--line); }
+.brand{ font-weight:800; color:var(--ink); }
+.navlink{ color:#374151; } .navlink:hover{ color:var(--brand); }
+.card{ background:#fff; border:1px solid var(--line); border-radius:1rem; box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.card-header{ padding:1rem 1.25rem; border-bottom:1px solid var(--line); }
+.card-body{ padding:1.25rem; }
+.btn{ display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.75rem; border:1px solid var(--brand); font-weight:600; }
+.btn-primary{ background:var(--brand); color:#fff; border-color:transparent; } .btn-primary:hover{ background:var(--brand-600); }
+.input{ border:1px solid var(--line); border-radius:.75rem; padding:.5rem .75rem; }
+.fc { --fc-border-color: var(--line); }
+.event-chip{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:8px 10px; box-shadow:0 4px 14px rgba(0,0,0,.04); }
+.event-chip .stripe{ width:6px; align-self:stretch; border-radius:8px; }
+.event-chip .avatar{ width:28px; height:28px; border-radius:999px; overflow:hidden; background:#F3F4F6; }
+.event-chip .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+.event-chip .meta{ display:flex; flex-direction:column; gap:2px; min-width:0 }
+.event-chip .title{ font-weight:800; font-size:12.5px; color:var(--ink); letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.event-chip .driver-name{ font-weight:800; font-size:12px; color:#111827; }
+.event-chip .sub{ font-size:12px; color:#6B7280; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+
+/* --- Techniline palette helpers (if not present) --- */
+:root{
+  --brand:#C0101A; --brand-600:#A40D16; --ink:#0B0B0C; --line:#E5E7EB;
+}
+.container-app{ max-width: 1100px; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
+.topbar{ position:sticky; top:0; z-index:20; backdrop-filter: blur(6px); background:rgba(255,255,255,.9); border-bottom:1px solid var(--line);}
+.brand{ font-weight:800; color:var(--ink); }
+.navlink{ color:#374151; }
+.navlink:hover{ color:var(--brand); }
+.card{ background:#fff; border:1px solid var(--line); border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+.card-header{ padding: 1rem 1.25rem; border-bottom:1px solid var(--line); }
+.card-body{ padding: 1.25rem; }
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:.5rem; padding:.5rem .9rem; border-radius:.75rem; border:1px solid var(--brand); font-weight:600; }
+.btn-primary{ background:var(--brand); color:#fff; border-color:transparent; }
+.btn-primary:hover{ background:var(--brand-600); }
+.input{ border:1px solid var(--line); border-radius:.75rem; padding:.5rem .75rem; }
+
+/* FullCalendar pill styling */
+.fc { --fc-border-color: var(--line); }
+.event-chip{
+  display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line);
+  border-radius:14px; padding:8px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.04);
+}
+.event-chip .stripe{ width:6px; align-self:stretch; border-radius:8px; }
+.event-chip .avatar{ width:28px; height:28px; border-radius:999px; overflow:hidden; background:#F3F4F6; }
+.event-chip .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+.event-chip .meta{ display:flex; flex-direction:column; gap:2px; min-width:0 }
+.event-chip .title{ font-weight:800; font-size:12.5px; color:var(--ink); letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.event-chip .driver-name{ font-weight:800; font-size:12px; color:#111827; }
+.event-chip .sub{ font-size:12px; color:#6B7280; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }

@@ -11,13 +11,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        {/* FullCalendar v6 CSS via CDN to avoid package export issues */}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/index.global.min.css" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.15/index.global.min.css" />
       </head>
       <body>
         <header className="topbar">
           <div className="container-app py-3 flex items-center gap-6">
-            <Link href="/" className="brand">Techniline Delivery Schedule Portal</Link>
+            <Link href="/" className="brand" aria-label="Techniline Delivery Schedule Portal">
+              Techniline Delivery Schedule Portal
+            </Link>
             <nav className="flex items-center gap-4 ml-auto">
               <Link href="/" className="navlink">Calendar</Link>
               <Link href="/requests" className="navlink">My Requests</Link>
