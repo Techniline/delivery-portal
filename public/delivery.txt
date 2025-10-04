@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeliveryFlow - Vehicle Scheduling Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-shadow {
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .booking-pill {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .booking-pill:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .status-pending { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+        .status-approved { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); }
+        .status-completed { background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%); }
+        .status-rejected { background: linear-gradient(135deg, #ff6b6b 0%, #ffa8a8 100%); }
+        
+        .branch-red { background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); }
+        .branch-blue { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .branch-green { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .branch-purple { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        
+        .modal {
+            backdrop-filter: blur(10px);
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+        }
+        
+        .time-slot {
+            min-height: 60px;
+            border: 1px solid #e5e7eb;
+            position: relative;
+        }
+        
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Navigation Header -->
+    <nav class="bg-white shadow-lg border-b-4 border-blue-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-4">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-gray-800">
+                            <i class="fas fa-truck text-blue-500 mr-2"></i>DeliveryFlow
+                        </h1>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <button onclick="showSection('dashboard')" class="nav-btn bg-blue-500 text-white px-4 py-2 rounded-lg">
+                                <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                            </button>
+                            <button onclick="showSection('bookings')" class="nav-btn text-gray-700 hover:text-blue-500 px-4 py-2 rounded-lg">
+                                <i class="fas fa-calendar-alt mr-2"></i>Bookings
+                            </button>
+                            <button onclick="showSection('drivers')" class="nav-btn text-gray-700 hover:text-blue-500 px-4 py-2 rounded-lg">
+                                <i class="fas fa-users mr-2"></i>Drivers
+                            </button>
+                            <button onclick="showSection('vehicles')" class="nav-btn text-gray-700 hover:text-blue-500 px-4 py-2 rounded-lg">
+                                <i class="fas fa-truck mr-2"></i>Vehicles
+                            </button>
+                            <button onclick="showSection('calendar')" class="nav-btn text-gray-700 hover:text-blue-500 px-4 py-2 rounded-lg">
+                                <i class="fas fa-calendar mr-2"></i>Calendar
+                            </button>
+                            <button onclick="showSection('reports')" class="nav-btn text-gray-700 hover:text-blue-500 px-4 py-2 rounded-lg">
+                                <i class="fas fa-chart-bar mr-2"></i>Reports
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <button class="text-gray-700 hover:text-blue-500 relative">
+                            <i class="fas fa-bell text-xl"></i>
+                            <span class="notification-badge absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23667eea'/%3E%3Ctext x='16' y='20' text-anchor='middle' fill='white' font-size='12' font-weight='bold'%3EWM%3C/text%3E%3C/svg%3E" alt="User" class="w-8 h-8 rounded-full">
+                        <span class="text-sm font-medium text-gray-700">Warehouse Manager</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="section">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="stats-card rounded-xl p-6 card-shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm font-medium">Total Bookings</p>
+                            <p class="text-3xl font-bold">247</p>
+                        </div>
+                        <i class="fas fa-calendar-check text-3xl opacity-80"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-green-400 to-green-600 rounded-xl p-6 card-shadow text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm font-medium">Completed</p>
+                            <p class="text-3xl font-bold">189</p>
+                        </div>
+                        <i class="fas fa-check-circle text-3xl opacity-80"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl p-6 card-shadow text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-yellow-100 text-sm font-medium">Pending</p>
+                            <p class="text-3xl font-bold">42</p>
+                        </div>
+                        <i class="fas fa-clock text-3xl opacity-80"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-red-400 to-red-600 rounded-xl p-6 card-shadow text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-red-100 text-sm font-medium">Overdue</p>
+                            <p class="text-3xl font-bold">16</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-3xl opacity-80"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button onclick="openBookingModal()" class="flex flex-col items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                        <i class="fas fa-plus-circle text-2xl text-blue-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700">New Booking</span>
+                    </button>
+                    <button onclick="showSection('drivers')" class="flex flex-col items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors">
+                        <i class="fas fa-user-plus text-2xl text-green-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700">Add Driver</span>
+                    </button>
+                    <button onclick="showSection('vehicles')" class="flex flex-col items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
+                        <i class="fas fa-truck text-2xl text-purple-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700">Add Vehicle</span>
+                    </button>
+                    <button onclick="exportCSV()" class="flex flex-col items-center p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors">
+                        <i class="fas fa-download text-2xl text-orange-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700">Export Report</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="bg-white rounded-xl card-shadow p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Recent Activity</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-4 p-3 bg-blue-50 rounded-lg">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-800">New booking created by Manager A</p>
+                            <p class="text-xs text-gray-500">DO-2024-001 • 2 minutes ago</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4 p-3 bg-green-50 rounded-lg">
+                        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-800">Delivery completed successfully</p>
+                            <p class="text-xs text-gray-500">DO-2024-002 • 15 minutes ago</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4 p-3 bg-yellow-50 rounded-lg">
+                        <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-800">Booking pending approval</p>
+                            <p class="text-xs text-gray-500">DO-2024-003 • 1 hour ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bookings Section -->
+        <div id="bookings-section" class="section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Vehicle Scheduling</h2>
+                <div class="flex space-x-4">
+                    <select id="statusFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="all">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="completed">Completed</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                    <button onclick="openBookingModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
+                        <i class="fas fa-plus mr-2"></i>New Booking
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calendar View -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">Calendar View</h3>
+                    <div class="flex space-x-2">
+                        <button onclick="previousWeek()" class="p-2 text-gray-600 hover:text-blue-500">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="currentWeek" class="px-4 py-2 text-sm font-medium text-gray-700">Dec 18-24, 2024</span>
+                        <button onclick="nextWeek()" class="p-2 text-gray-600 hover:text-blue-500">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="calendar-grid">
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Mon</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Tue</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Wed</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Thu</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Fri</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Sat</div>
+                    <div class="font-medium text-center py-2 bg-gray-100 text-gray-700">Sun</div>
+                    
+                    <!-- Time slots for each day -->
+                    <div class="time-slot bg-white p-2">
+                        <div class="booking-pill status-pending text-white text-xs p-2 rounded mb-1">
+                            <div class="font-medium">DO-001</div>
+                            <div>ABC Corp</div>
+                        </div>
+                    </div>
+                    <div class="time-slot bg-white p-2">
+                        <div class="booking-pill status-approved text-white text-xs p-2 rounded mb-1">
+                            <div class="font-medium">DO-002</div>
+                            <div>XYZ Ltd</div>
+                        </div>
+                    </div>
+                    <div class="time-slot bg-white p-2"></div>
+                    <div class="time-slot bg-white p-2">
+                        <div class="booking-pill status-completed text-white text-xs p-2 rounded mb-1">
+                            <div class="font-medium">DO-003</div>
+                            <div>Tech Solutions</div>
+                        </div>
+                    </div>
+                    <div class="time-slot bg-white p-2"></div>
+                    <div class="time-slot bg-white p-2">
+                        <div class="booking-pill status-rejected text-white text-xs p-2 rounded mb-1">
+                            <div class="font-medium">DO-004</div>
+                            <div>Global Inc</div>
+                        </div>
+                    </div>
+                    <div class="time-slot bg-white p-2"></div>
+                </div>
+            </div>
+
+            <!-- Bookings List -->
+            <div class="bg-white rounded-xl card-shadow overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-800">All Bookings</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DO Number</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="bookingsTable">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">DO-2024-001</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">ABC Corporation</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="branch-red text-white px-2 py-1 rounded-full text-xs font-medium">Branch A</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dec 20, 2024</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-pending text-white px-2 py-1 rounded-full text-xs font-medium">Pending</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                    <button onclick="approveBooking('DO-2024-001')" class="text-green-600 hover:text-green-900">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button onclick="rejectBooking('DO-2024-001')" class="text-red-600 hover:text-red-900">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <button onclick="viewBooking('DO-2024-001')" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">DO-2024-002</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">XYZ Limited</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="branch-blue text-white px-2 py-1 rounded-full text-xs font-medium">Branch B</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Dec 21, 2024</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="status-approved text-white px-2 py-1 rounded-full text-xs font-medium">Approved</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                    <button onclick="viewBooking('DO-2024-002')" class="text-blue-600 hover:text-blue-900">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drivers Section -->
+        <div id="drivers-section" class="section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Driver Management</h2>
+                <button onclick="openDriverModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
+                    <i class="fas fa-plus mr-2"></i>Add Driver
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%234facfe'/%3E%3Ctext x='24' y='28' text-anchor='middle' fill='white' font-size='16' font-weight='bold'%3EJD%3C/text%3E%3C/svg%3E" alt="Driver" class="w-12 h-12 rounded-full">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">John Doe</h3>
+                            <p class="text-sm text-gray-500">License: DL123456</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Status:</span>
+                            <span class="text-green-600 font-medium">Available</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Vehicle:</span>
+                            <span class="text-gray-800">TRK-001</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Phone:</span>
+                            <span class="text-gray-800">+1234567890</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex space-x-2">
+                        <button class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-edit mr-1"></i>Edit
+                        </button>
+                        <button class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-trash mr-1"></i>Remove
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center space-x-4 mb-4">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='24' fill='%2343e97b'/%3E%3Ctext x='24' y='28' text-anchor='middle' fill='white' font-size='16' font-weight='bold'%3EMS%3C/text%3E%3C/svg%3E" alt="Driver" class="w-12 h-12 rounded-full">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">Mike Smith</h3>
+                            <p class="text-sm text-gray-500">License: DL789012</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Status:</span>
+                            <span class="text-yellow-600 font-medium">On Delivery</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Vehicle:</span>
+                            <span class="text-gray-800">TRK-002</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Phone:</span>
+                            <span class="text-gray-800">+1234567891</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex space-x-2">
+                        <button class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-edit mr-1"></i>Edit
+                        </button>
+                        <button class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-trash mr-1"></i>Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vehicles Section -->
+        <div id="vehicles-section" class="section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Vehicle Management</h2>
+                <button onclick="openVehicleModal()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-medium">
+                    <i class="fas fa-plus mr-2"></i>Add Vehicle
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-800">TRK-001</h3>
+                        <span class="text-green-600 bg-green-100 px-2 py-1 rounded-full text-xs font-medium">Available</span>
+                    </div>
+                    <div class="space-y-2 mb-4">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Type:</span>
+                            <span class="text-gray-800">Delivery Truck</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Capacity:</span>
+                            <span class="text-gray-800">5 Tons</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Driver:</span>
+                            <span class="text-gray-800">John Doe</span>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-edit mr-1"></i>Edit
+                        </button>
+                        <button class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-trash mr-1"></i>Remove
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-gray-800">TRK-002</h3>
+                        <span class="text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full text-xs font-medium">In Use</span>
+                    </div>
+                    <div class="space-y-2 mb-4">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Type:</span>
+                            <span class="text-gray-800">Van</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Capacity:</span>
+                            <span class="text-gray-800">2 Tons</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Driver:</span>
+                            <span class="text-gray-800">Mike Smith</span>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-edit mr-1"></i>Edit
+                        </button>
+                        <button class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg text-sm">
+                            <i class="fas fa-trash mr-1"></i>Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar Section -->
+        <div id="calendar-section" class="section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Delivery Calendar</h2>
+                <div class="flex space-x-4">
+                    <select id="calendarView" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="month">Monthly View</option>
+                        <option value="year">Yearly View</option>
+                    </select>
+                    <button onclick="printCalendar()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-print mr-2"></i>Print
+                    </button>
+                    <button onclick="emailCalendar()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <i class="fas fa-envelope mr-2"></i>Email
+                    </button>
+                </div>
+            </div>
+
+            <!-- Calendar Navigation -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="previousMonth()" class="p-2 text-gray-600 hover:text-blue-500">
+                        <i class="fas fa-chevron-left text-xl"></i>
+                    </button>
+                    <h3 id="currentMonth" class="text-2xl font-bold text-gray-800">December 2024</h3>
+                    <button onclick="nextMonth()" class="p-2 text-gray-600 hover:text-blue-500">
+                        <i class="fas fa-chevron-right text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Monthly Calendar Grid -->
+                <div id="monthlyCalendar" class="grid grid-cols-7 gap-1">
+                    <!-- Calendar headers -->
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Sun</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Mon</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Tue</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Wed</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Thu</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Fri</div>
+                    <div class="text-center font-semibold text-gray-700 py-3 bg-gray-100">Sat</div>
+                    
+                    <!-- Calendar days will be generated by JavaScript -->
+                </div>
+
+                <!-- Yearly Overview -->
+                <div id="yearlyCalendar" class="hidden grid grid-cols-3 gap-6">
+                    <!-- 12 months mini calendars will be generated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Calendar Legend -->
+            <div class="bg-white rounded-xl card-shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Legend</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-blue-500 rounded"></div>
+                        <span class="text-sm text-gray-700">Scheduled</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-yellow-500 rounded"></div>
+                        <span class="text-sm text-gray-700">Dispatched</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-green-500 rounded"></div>
+                        <span class="text-sm text-gray-700">Delivered</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="w-4 h-4 bg-red-500 rounded"></div>
+                        <span class="text-sm text-gray-700">Overdue</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monthly Summary -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">This Month</p>
+                            <p class="text-2xl font-bold text-blue-600">156</p>
+                            <p class="text-xs text-gray-500">Total Deliveries</p>
+                        </div>
+                        <i class="fas fa-calendar-alt text-3xl text-blue-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Dispatched</p>
+                            <p class="text-2xl font-bold text-yellow-600">42</p>
+                            <p class="text-xs text-gray-500">In Transit</p>
+                        </div>
+                        <i class="fas fa-shipping-fast text-3xl text-yellow-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Completed</p>
+                            <p class="text-2xl font-bold text-green-600">98</p>
+                            <p class="text-xs text-gray-500">Delivered</p>
+                        </div>
+                        <i class="fas fa-check-circle text-3xl text-green-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-600">Pending</p>
+                            <p class="text-2xl font-bold text-red-600">16</p>
+                            <p class="text-xs text-gray-500">Overdue</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-3xl text-red-500"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div id="reports-section" class="section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Reports & Analytics</h2>
+                <button onclick="exportCSV()" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-medium">
+                    <i class="fas fa-download mr-2"></i>Export CSV
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Delivery Performance</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">On-time Deliveries</span>
+                            <span class="text-green-600 font-semibold">89%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full" style="width: 89%"></div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Late Deliveries</span>
+                            <span class="text-yellow-600 font-semibold">8%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-yellow-500 h-2 rounded-full" style="width: 8%"></div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Failed Deliveries</span>
+                            <span class="text-red-600 font-semibold">3%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-red-500 h-2 rounded-full" style="width: 3%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Branch Performance</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 branch-red rounded-full"></div>
+                                <span class="text-gray-700">Branch A</span>
+                            </div>
+                            <span class="font-semibold">124 deliveries</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 branch-blue rounded-full"></div>
+                                <span class="text-gray-700">Branch B</span>
+                            </div>
+                            <span class="font-semibold">98 deliveries</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-3 h-3 branch-green rounded-full"></div>
+                                <span class="text-gray-700">Branch C</span>
+                            </div>
+                            <span class="font-semibold">76 deliveries</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Create New Booking</h3>
+                <button onclick="closeBookingModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="bookingForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Order Number</label>
+                        <input type="text" id="doNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="DO-2024-XXX" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Branch</label>
+                        <select id="branch" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                            <option value="">Select Branch</option>
+                            <option value="branch-a">Branch A</option>
+                            <option value="branch-b">Branch B</option>
+                            <option value="branch-c">Branch C</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Customer Name</label>
+                        <input type="text" id="customerName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Customer Phone</label>
+                        <input type="tel" id="customerPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Customer Address</label>
+                    <textarea id="customerAddress" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required></textarea>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Delivery Date</label>
+                        <input type="date" id="deliveryDate" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Dispatch Time</label>
+                        <input type="time" id="dispatchTime" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Total Box Quantity</label>
+                        <input type="number" id="boxQuantity" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" min="1" required>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Customer's Own Packages</label>
+                        <input type="number" id="customerBoxes" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" min="0" placeholder="0">
+                        <p class="text-xs text-gray-500 mt-1">Number of customer's own packages</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">TLE Box Quantity</label>
+                        <input type="number" id="tleBoxes" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" min="0" placeholder="0">
+                        <p class="text-xs text-gray-500 mt-1">Company provided boxes</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                    <select id="packageType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        <option value="">Select Package Type</option>
+                        <option value="standard">Standard Package</option>
+                        <option value="custom">Customer's Own Package</option>
+                        <option value="fragile">Fragile Items</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Box Naming Tag</label>
+                    <input type="text" id="boxTag" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="e.g., Electronics, Documents">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Attach Document</label>
+                    <input type="file" id="document" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" accept=".pdf,.doc,.docx,.jpg,.png">
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" onclick="closeBookingModal()" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
+                        Create Booking
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Driver Modal -->
+    <div id="driverModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Add New Driver</h3>
+                <button onclick="closeDriverModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="driverForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Driver Photo</label>
+                    <input type="file" id="driverPhoto" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" accept="image/*">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <input type="text" id="driverName" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">License Number</label>
+                    <input type="text" id="licenseNumber" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                    <input type="tel" id="driverPhone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" onclick="closeDriverModal()" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
+                        Add Driver
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delivery Summary Modal -->
+    <div id="deliverySummaryModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Delivery Summary</h3>
+                <div class="flex space-x-2">
+                    <button onclick="printSummary()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm">
+                        <i class="fas fa-print mr-2"></i>Print
+                    </button>
+                    <button onclick="emailSummary()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">
+                        <i class="fas fa-envelope mr-2"></i>Email
+                    </button>
+                    <button onclick="closeSummaryModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="summaryContent" class="space-y-6">
+                <!-- Summary content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Vehicle Modal -->
+    <div id="vehicleModal" class="fixed inset-0 bg-black bg-opacity-50 modal hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Add New Vehicle</h3>
+                <button onclick="closeVehicleModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="vehicleForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Vehicle ID</label>
+                    <input type="text" id="vehicleId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="TRK-XXX" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Vehicle Type</label>
+                    <select id="vehicleType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        <option value="">Select Type</option>
+                        <option value="truck">Delivery Truck</option>
+                        <option value="van">Van</option>
+                        <option value="motorcycle">Motorcycle</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Capacity</label>
+                    <input type="text" id="vehicleCapacity" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="e.g., 5 Tons" required>
+                </div>
+                
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" onclick="closeVehicleModal()" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">
+                        Add Vehicle
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentUser = 'warehouse-manager'; // Can be 'showroom-manager-1', 'showroom-manager-2', 'warehouse-manager'
+        let bookings = [];
+        let drivers = [];
+        let vehicles = [];
+
+        // Navigation
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName + '-section').classList.remove('hidden');
+            
+            // Update navigation buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-500', 'text-white');
+                btn.classList.add('text-gray-700', 'hover:text-blue-500');
+            });
+            
+            event.target.classList.add('bg-blue-500', 'text-white');
+            event.target.classList.remove('text-gray-700', 'hover:text-blue-500');
+        }
+
+        // Modal functions
+        function openBookingModal() {
+            document.getElementById('bookingModal').classList.remove('hidden');
+        }
+
+        function closeBookingModal() {
+            document.getElementById('bookingModal').classList.add('hidden');
+            document.getElementById('bookingForm').reset();
+        }
+
+        function openDriverModal() {
+            document.getElementById('driverModal').classList.remove('hidden');
+        }
+
+        function closeDriverModal() {
+            document.getElementById('driverModal').classList.add('hidden');
+            document.getElementById('driverForm').reset();
+        }
+
+        function openVehicleModal() {
+            document.getElementById('vehicleModal').classList.remove('hidden');
+        }
+
+        function closeVehicleModal() {
+            document.getElementById('vehicleModal').classList.add('hidden');
+            document.getElementById('vehicleForm').reset();
+        }
+
+        // Booking functions
+        function approveBooking(doNumber) {
+            if (currentUser !== 'warehouse-manager') {
+                alert('Only warehouse manager can approve bookings');
+                return;
+            }
+            alert(`Booking ${doNumber} approved successfully!`);
+            // Update booking status in the table
+            updateBookingStatus(doNumber, 'approved');
+        }
+
+        function rejectBooking(doNumber) {
+            if (currentUser !== 'warehouse-manager') {
+                alert('Only warehouse manager can reject bookings');
+                return;
+            }
+            const reason = prompt('Please provide a reason for rejection:');
+            if (reason) {
+                alert(`Booking ${doNumber} rejected. Reason: ${reason}`);
+                updateBookingStatus(doNumber, 'rejected');
+            }
+        }
+
+        function viewBooking(doNumber) {
+            alert(`Viewing details for booking ${doNumber}`);
+            // Here you would open a detailed view modal
+        }
+
+        function dispatchBooking(doNumber) {
+            if (currentUser !== 'warehouse-manager') {
+                alert('Only warehouse manager can dispatch bookings');
+                return;
+            }
+            const dispatchTime = prompt('Enter dispatch time (HH:MM):');
+            if (dispatchTime) {
+                alert(`Booking ${doNumber} dispatched at ${dispatchTime}`);
+                updateBookingStatus(doNumber, 'dispatched');
+            }
+        }
+
+        function completeBooking(doNumber) {
+            const confirmation = confirm(`Mark booking ${doNumber} as completed?`);
+            if (confirmation) {
+                alert(`Booking ${doNumber} marked as completed!`);
+                updateBookingStatus(doNumber, 'delivered');
+            }
+        }
+
+        function printBooking(doNumber) {
+            const printContent = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2>Delivery Order: ${doNumber}</h2>
+                    <hr>
+                    <p><strong>Customer:</strong> Sample Customer</p>
+                    <p><strong>Phone:</strong> +1234567890</p>
+                    <p><strong>Address:</strong> Sample Address</p>
+                    <p><strong>Delivery Date:</strong> ${new Date().toDateString()}</p>
+                    <p><strong>Dispatch Time:</strong> 09:00 AM</p>
+                    <p><strong>TLE Boxes:</strong> 5</p>
+                    <p><strong>Customer Boxes:</strong> 2</p>
+                    <p><strong>Total Boxes:</strong> 7</p>
+                    <hr>
+                    <p><em>Generated on: ${new Date().toLocaleString()}</em></p>
+                </div>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head><title>Delivery Order - ${doNumber}</title></head>
+                    <body>${printContent}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function updateBookingStatus(doNumber, status) {
+            // Find and update the booking row
+            const rows = document.querySelectorAll('#bookingsTable tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0 && cells[0].textContent === doNumber) {
+                    const statusCell = cells[4];
+                    const statusSpan = statusCell.querySelector('span');
+                    statusSpan.className = `status-${status} text-white px-2 py-1 rounded-full text-xs font-medium`;
+                    statusSpan.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                }
+            });
+        }
+
+        // Calendar functions
+        let currentDate = new Date();
+        
+        function previousWeek() {
+            // Implementation for previous week navigation
+            console.log('Previous week');
+        }
+
+        function nextWeek() {
+            // Implementation for next week navigation
+            console.log('Next week');
+        }
+
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            updateCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            updateCalendar();
+        }
+
+        function updateCalendar() {
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
+            
+            document.getElementById('currentMonth').textContent = 
+                `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+            
+            generateCalendarDays();
+        }
+
+        function generateCalendarDays() {
+            const calendar = document.getElementById('monthlyCalendar');
+            const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            // Clear existing days (keep headers)
+            const existingDays = calendar.querySelectorAll('.calendar-day');
+            existingDays.forEach(day => day.remove());
+            
+            // Generate 42 days (6 weeks)
+            for (let i = 0; i < 42; i++) {
+                const dayDate = new Date(startDate);
+                dayDate.setDate(startDate.getDate() + i);
+                
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day min-h-24 border border-gray-200 p-2 bg-white hover:bg-gray-50 cursor-pointer';
+                
+                const isCurrentMonth = dayDate.getMonth() === currentDate.getMonth();
+                const isToday = dayDate.toDateString() === new Date().toDateString();
+                
+                if (!isCurrentMonth) {
+                    dayElement.classList.add('text-gray-400', 'bg-gray-50');
+                }
+                
+                if (isToday) {
+                    dayElement.classList.add('bg-blue-100', 'border-blue-300');
+                }
+                
+                dayElement.innerHTML = `
+                    <div class="font-medium text-sm ${isCurrentMonth ? 'text-gray-800' : 'text-gray-400'}">
+                        ${dayDate.getDate()}
+                    </div>
+                    <div class="mt-1 space-y-1">
+                        ${generateDeliveryPills(dayDate)}
+                    </div>
+                `;
+                
+                dayElement.onclick = () => showDayDetails(dayDate);
+                calendar.appendChild(dayElement);
+            }
+        }
+
+        function generateDeliveryPills(date) {
+            // Sample delivery data - in real app, this would come from database
+            const deliveries = getSampleDeliveries(date);
+            
+            return deliveries.map(delivery => `
+                <div class="text-xs px-2 py-1 rounded text-white ${getStatusColor(delivery.status)} truncate">
+                    ${delivery.doNumber}
+                </div>
+            `).join('');
+        }
+
+        function getSampleDeliveries(date) {
+            // Generate sample deliveries for demonstration
+            const deliveries = [];
+            const random = Math.random();
+            
+            if (random > 0.7) {
+                deliveries.push({
+                    doNumber: `DO-${Math.floor(Math.random() * 1000)}`,
+                    status: ['scheduled', 'dispatched', 'delivered', 'overdue'][Math.floor(Math.random() * 4)]
+                });
+            }
+            
+            if (random > 0.9) {
+                deliveries.push({
+                    doNumber: `DO-${Math.floor(Math.random() * 1000)}`,
+                    status: ['scheduled', 'dispatched', 'delivered', 'overdue'][Math.floor(Math.random() * 4)]
+                });
+            }
+            
+            return deliveries;
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'scheduled': 'bg-blue-500',
+                'dispatched': 'bg-yellow-500',
+                'delivered': 'bg-green-500',
+                'overdue': 'bg-red-500'
+            };
+            return colors[status] || 'bg-gray-500';
+        }
+
+        function showDayDetails(date) {
+            const deliveries = getSampleDeliveries(date);
+            if (deliveries.length === 0) {
+                alert(`No deliveries scheduled for ${date.toDateString()}`);
+                return;
+            }
+            
+            openDeliverySummary(date, deliveries);
+        }
+
+        function openDeliverySummary(date, deliveries) {
+            const modal = document.getElementById('deliverySummaryModal');
+            const content = document.getElementById('summaryContent');
+            
+            content.innerHTML = `
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 rounded-lg mb-6">
+                    <h4 class="text-2xl font-bold mb-2">Delivery Summary</h4>
+                    <p class="text-blue-100">${date.toDateString()}</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-blue-600">${deliveries.filter(d => d.status === 'scheduled').length}</div>
+                        <div class="text-sm text-gray-600">Scheduled</div>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-yellow-600">${deliveries.filter(d => d.status === 'dispatched').length}</div>
+                        <div class="text-sm text-gray-600">Dispatched</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-green-600">${deliveries.filter(d => d.status === 'delivered').length}</div>
+                        <div class="text-sm text-gray-600">Delivered</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-red-600">${deliveries.filter(d => d.status === 'overdue').length}</div>
+                        <div class="text-sm text-gray-600">Overdue</div>
+                    </div>
+                </div>
+                
+                <div class="bg-white border rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-3 border-b">
+                        <h5 class="font-semibold text-gray-800">Delivery Details</h5>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">DO Number</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dispatch Time</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">TLE Boxes</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Boxes</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                ${deliveries.map(delivery => `
+                                    <tr>
+                                        <td class="px-6 py-4 text-sm font-medium text-gray-900">${delivery.doNumber}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">Sample Customer</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">09:00 AM</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">${Math.floor(Math.random() * 10) + 1}</td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">${Math.floor(Math.random() * 5)}</td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 text-xs font-medium rounded-full text-white ${getStatusColor(delivery.status)}">
+                                                ${delivery.status.charAt(0).toUpperCase() + delivery.status.slice(1)}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeSummaryModal() {
+            document.getElementById('deliverySummaryModal').classList.add('hidden');
+        }
+
+        function printSummary() {
+            const content = document.getElementById('summaryContent').innerHTML;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Delivery Summary</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; margin: 20px; }
+                            .bg-blue-50 { background-color: #eff6ff; }
+                            .bg-yellow-50 { background-color: #fffbeb; }
+                            .bg-green-50 { background-color: #f0fdf4; }
+                            .bg-red-50 { background-color: #fef2f2; }
+                            table { width: 100%; border-collapse: collapse; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f9fafb; }
+                        </style>
+                    </head>
+                    <body>${content}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function emailSummary() {
+            const subject = encodeURIComponent('Delivery Summary Report');
+            const body = encodeURIComponent('Please find the delivery summary attached.');
+            window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+        }
+
+        function printCalendar() {
+            window.print();
+        }
+
+        function emailCalendar() {
+            const subject = encodeURIComponent('Monthly Delivery Calendar');
+            const body = encodeURIComponent('Please find the monthly delivery calendar attached.');
+            window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+        }
+
+        // Export function
+        function exportCSV() {
+            // Create sample CSV data
+            const csvData = [
+                ['DO Number', 'Customer', 'Branch', 'Date', 'Status'],
+                ['DO-2024-001', 'ABC Corporation', 'Branch A', 'Dec 20, 2024', 'Pending'],
+                ['DO-2024-002', 'XYZ Limited', 'Branch B', 'Dec 21, 2024', 'Approved']
+            ];
+            
+            const csvContent = csvData.map(row => row.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'delivery_report.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Form submissions
+        document.getElementById('bookingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const bookingData = {
+                doNumber: document.getElementById('doNumber').value,
+                customerName: document.getElementById('customerName').value,
+                customerPhone: document.getElementById('customerPhone').value,
+                customerAddress: document.getElementById('customerAddress').value,
+                deliveryDate: document.getElementById('deliveryDate').value,
+                dispatchTime: document.getElementById('dispatchTime').value,
+                branch: document.getElementById('branch').value,
+                boxQuantity: document.getElementById('boxQuantity').value,
+                customerBoxes: document.getElementById('customerBoxes').value || 0,
+                tleBoxes: document.getElementById('tleBoxes').value || 0,
+                packageType: document.getElementById('packageType').value,
+                boxTag: document.getElementById('boxTag').value,
+                status: 'scheduled',
+                createdBy: currentUser,
+                createdAt: new Date().toISOString()
+            };
+            
+            // Here you would send to Supabase
+            console.log('Creating booking:', bookingData);
+            
+            alert('Booking created successfully!');
+            closeBookingModal();
+            
+            // Add to bookings table (in real app, this would refresh from database)
+            addBookingToTable(bookingData);
+        });
+
+        document.getElementById('driverForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const driverData = {
+                name: document.getElementById('driverName').value,
+                license: document.getElementById('licenseNumber').value,
+                phone: document.getElementById('driverPhone').value,
+                photo: document.getElementById('driverPhoto').files[0]
+            };
+            
+            console.log('Adding driver:', driverData);
+            alert('Driver added successfully!');
+            closeDriverModal();
+        });
+
+        document.getElementById('vehicleForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const vehicleData = {
+                id: document.getElementById('vehicleId').value,
+                type: document.getElementById('vehicleType').value,
+                capacity: document.getElementById('vehicleCapacity').value
+            };
+            
+            console.log('Adding vehicle:', vehicleData);
+            alert('Vehicle added successfully!');
+            closeVehicleModal();
+        });
+
+        function addBookingToTable(booking) {
+            const tbody = document.getElementById('bookingsTable');
+            const row = document.createElement('tr');
+            
+            const branchColors = {
+                'branch-a': 'branch-red',
+                'branch-b': 'branch-blue',
+                'branch-c': 'branch-green'
+            };
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${booking.doNumber}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${booking.customerName}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="${branchColors[booking.branch]} text-white px-2 py-1 rounded-full text-xs font-medium">${booking.branch.replace('-', ' ').toUpperCase()}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${booking.deliveryDate}</td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="status-${booking.status} text-white px-2 py-1 rounded-full text-xs font-medium">${booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                    <button onclick="approveBooking('${booking.doNumber}')" class="text-green-600 hover:text-green-900" title="Approve">
+                        <i class="fas fa-check"></i>
+                    </button>
+                    <button onclick="rejectBooking('${booking.doNumber}')" class="text-red-600 hover:text-red-900" title="Reject">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button onclick="dispatchBooking('${booking.doNumber}')" class="text-yellow-600 hover:text-yellow-900" title="Dispatch">
+                        <i class="fas fa-shipping-fast"></i>
+                    </button>
+                    <button onclick="completeBooking('${booking.doNumber}')" class="text-purple-600 hover:text-purple-900" title="Mark Complete">
+                        <i class="fas fa-check-circle"></i>
+                    </button>
+                    <button onclick="viewBooking('${booking.doNumber}')" class="text-blue-600 hover:text-blue-900" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button onclick="printBooking('${booking.doNumber}')" class="text-gray-600 hover:text-gray-900" title="Print">
+                        <i class="fas fa-print"></i>
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        }
+
+        // Filter functionality
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            const filterValue = this.value;
+            const rows = document.querySelectorAll('#bookingsTable tr');
+            
+            rows.forEach(row => {
+                if (filterValue === 'all') {
+                    row.style.display = '';
+                } else {
+                    const statusCell = row.querySelector('td:nth-child(5) span');
+                    if (statusCell && statusCell.textContent.toLowerCase().includes(filterValue)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        });
+
+        // Initialize notifications (simulate delivery alerts)
+        function initializeNotifications() {
+            // Simulate checking for deliveries due tomorrow
+            setTimeout(() => {
+                if (Math.random() > 0.5) {
+                    alert('🚨 Delivery Alert: 3 deliveries scheduled for tomorrow require attention!');
+                }
+            }, 3000);
+        }
+
+        // Calendar view toggle
+        document.getElementById('calendarView').addEventListener('change', function() {
+            const monthlyCalendar = document.getElementById('monthlyCalendar');
+            const yearlyCalendar = document.getElementById('yearlyCalendar');
+            
+            if (this.value === 'year') {
+                monthlyCalendar.classList.add('hidden');
+                yearlyCalendar.classList.remove('hidden');
+                generateYearlyView();
+            } else {
+                monthlyCalendar.classList.remove('hidden');
+                yearlyCalendar.classList.add('hidden');
+                updateCalendar();
+            }
+        });
+
+        function generateYearlyView() {
+            const yearlyCalendar = document.getElementById('yearlyCalendar');
+            const currentYear = currentDate.getFullYear();
+            
+            yearlyCalendar.innerHTML = '';
+            
+            for (let month = 0; month < 12; month++) {
+                const monthDiv = document.createElement('div');
+                monthDiv.className = 'bg-white border rounded-lg p-4';
+                
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                
+                monthDiv.innerHTML = `
+                    <h4 class="font-semibold text-center mb-3 text-gray-800">${monthNames[month]} ${currentYear}</h4>
+                    <div class="grid grid-cols-7 gap-1 text-xs">
+                        <div class="text-center font-medium text-gray-600">S</div>
+                        <div class="text-center font-medium text-gray-600">M</div>
+                        <div class="text-center font-medium text-gray-600">T</div>
+                        <div class="text-center font-medium text-gray-600">W</div>
+                        <div class="text-center font-medium text-gray-600">T</div>
+                        <div class="text-center font-medium text-gray-600">F</div>
+                        <div class="text-center font-medium text-gray-600">S</div>
+                        ${generateMiniCalendarDays(currentYear, month)}
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div class="text-sm text-gray-600">
+                            <span class="inline-block w-2 h-2 bg-blue-500 rounded mr-1"></span>
+                            ${Math.floor(Math.random() * 20) + 5} deliveries
+                        </div>
+                    </div>
+                `;
+                
+                yearlyCalendar.appendChild(monthDiv);
+            }
+        }
+
+        function generateMiniCalendarDays(year, month) {
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            let daysHTML = '';
+            
+            for (let i = 0; i < 42; i++) {
+                const dayDate = new Date(startDate);
+                dayDate.setDate(startDate.getDate() + i);
+                
+                const isCurrentMonth = dayDate.getMonth() === month;
+                const hasDelivery = Math.random() > 0.8;
+                
+                daysHTML += `
+                    <div class="text-center py-1 ${isCurrentMonth ? 'text-gray-800' : 'text-gray-400'} 
+                         ${hasDelivery && isCurrentMonth ? 'bg-blue-100 rounded' : ''}">
+                        ${dayDate.getDate()}
+                    </div>
+                `;
+            }
+            
+            return daysHTML;
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeNotifications();
+            updateCalendar();
+            
+            // Set minimum date to today for delivery date input
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('deliveryDate').setAttribute('min', today);
+        });
+
+        // Close modals when clicking outside
+        window.addEventListener('click', function(e) {
+            const modals = ['bookingModal', 'driverModal', 'vehicleModal'];
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9892a82743283415',t:'MTc1OTU1OTcwMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
